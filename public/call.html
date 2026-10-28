@@ -3,208 +3,255 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark">
 <title>Hotseat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,450;6..72,550&display=swap">
 <style>
+/* Hallmark · component: call window · genre: editorial/technical · theme: custom "broadcast desk"
+ * vibe: on-air interview ledger, quiet greys, one tally red
+ * paper oklch(98.5% 0.003 250) · accent oklch(58% 0.19 27) tally · Newsreader + IBM Plex Sans + Plex Mono
+ * states: idle · connecting · live · thinking · ended · error
+ */
 :root {
-  --bg: #f5f4f1;
-  --pill: #0c0c0d;
-  --pill-edge: rgba(255, 255, 255, 0);
-  --pill-shadow: 0 18px 50px -20px rgba(12, 12, 13, 0.55), 0 2px 6px rgba(12, 12, 13, 0.12);
-  --on-pill: #f4f4f5;
-  --on-pill-muted: rgba(244, 244, 245, 0.56);
-  --on-pill-faint: rgba(244, 244, 245, 0.16);
-  --on-pill-fill: rgba(255, 255, 255, 0.08);
-  --heat: #ff6a1a;
-  --heat-deep: #b83a00;
-  --heat-glow: rgba(255, 106, 26, 0.35);
-  --danger: #ff453a;
-  --success: #34c759;
-  --focus: #ff8a47;
-  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, Roboto, sans-serif;
-  --ease: cubic-bezier(0.32, 0.72, 0, 1);
-  --spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --color-paper: oklch(98.5% 0.003 250);
+  --color-paper-2: oklch(95.5% 0.005 250);
+  --color-ink: oklch(22% 0.012 250);
+  --color-ink-2: oklch(45% 0.012 250);
+  --color-ink-3: oklch(62% 0.01 250);
+  --color-rule: oklch(89% 0.006 250);
+  --color-tally: oklch(58% 0.19 27);
+  --color-tally-soft: oklch(58% 0.19 27 / 0.14);
+  --color-wait: oklch(72% 0.14 75);
+  --color-wait-ink: oklch(52% 0.12 65);
+  --color-done: oklch(52% 0.11 155);
+  --color-on-tally: oklch(99% 0 0);
+  --color-focus: oklch(55% 0.15 250);
+
+  --font-display: "Newsreader", "Iowan Old Style", Georgia, serif;
+  --font-body: "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.9375rem;
+  --text-q: clamp(1.5rem, 1.1rem + 1.8vw, 2.125rem);
+
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+
+  --radius-sm: 6px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 140ms;
+  --dur-med: 260ms;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #09090a;
-    --pill: #18181a;
-    --pill-edge: rgba(255, 255, 255, 0.07);
-    --pill-shadow: 0 18px 60px -24px rgba(0, 0, 0, 0.9);
+    --color-paper: oklch(17% 0.006 250);
+    --color-paper-2: oklch(21% 0.008 250);
+    --color-ink: oklch(94% 0.004 250);
+    --color-ink-2: oklch(74% 0.008 250);
+    --color-ink-3: oklch(56% 0.008 250);
+    --color-rule: oklch(29% 0.008 250);
+    --color-tally: oklch(66% 0.19 27);
+    --color-tally-soft: oklch(66% 0.19 27 / 0.18);
+    --color-wait: oklch(78% 0.13 75);
+    --color-wait-ink: oklch(78% 0.13 75);
+    --color-done: oklch(72% 0.12 155);
+    --color-focus: oklch(72% 0.13 250);
     color-scheme: dark;
   }
 }
+
 * { box-sizing: border-box; }
-html, body { margin: 0; min-height: 100%; }
+html, body { margin: 0; min-height: 100%; overflow-x: clip; }
 body {
-  background: var(--bg);
-  color: var(--on-pill);
-  font: 14px/1.4 var(--sans);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font: 400 var(--text-md)/1.5 var(--font-body);
   -webkit-font-smoothing: antialiased;
-  padding: 20px 12px;
-  display: flex;
-  justify-content: center;
 }
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
-:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
-.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-
-/* pill */
-.pill {
-  width: min(100%, 520px);
-  background: var(--pill);
-  box-shadow: inset 0 0 0 1px var(--pill-edge), var(--pill-shadow);
-  border-radius: 30px;
-  padding: 10px;
-  display: grid;
-  grid-template-rows: auto 0fr;
-  transition: width 0.55s var(--ease), border-radius 0.55s var(--ease), grid-template-rows 0.55s var(--ease), padding 0.55s var(--ease);
-}
-.pill[data-state="idle"], .pill[data-state="connecting"] { width: min(100%, 300px); }
-.pill[data-state="live"], .pill[data-state="ended"] { grid-template-rows: auto 1fr; border-radius: 28px; padding: 12px 12px 14px; }
-
-.head { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.who { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; min-height: 40px; }
-.title { font-size: 15px; font-weight: 620; letter-spacing: -0.015em; line-height: 1.2; }
-.sub {
-  font-size: 12.5px; color: var(--on-pill-muted); font-variant-numeric: tabular-nums;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.35;
-}
-.sub:empty { display: none; }
-
-/* avatar */
-.avatar {
-  --level: 0;
-  flex: none; width: 40px; height: 40px; border-radius: 50%; position: relative;
-  background: radial-gradient(circle at 50% 34%, #ffb27a 0%, var(--heat) 42%, var(--heat-deep) 100%);
-  box-shadow: 0 0 0 calc(var(--level) * 7px) var(--heat-glow), 0 0 calc(10px + var(--level) * 18px) -4px var(--heat);
-  scale: calc(1 + var(--level) * 0.1);
-  transition: filter 0.5s var(--ease), opacity 0.5s var(--ease);
-}
-.pill[data-state="idle"] .avatar, .pill[data-state="ended"] .avatar { filter: saturate(0.25) brightness(0.8); opacity: 0.7; }
-.pill[data-state="connecting"] .avatar { animation: pulse 1.4s ease-in-out infinite; }
-.pill[data-state="live"][data-mode="listening"] .avatar { animation: breathe 3.6s ease-in-out infinite; }
-@keyframes breathe { 50% { filter: brightness(1.12); } }
-@keyframes pulse { 50% { opacity: 0.45; scale: 0.92; } }
-
-/* waveform + controls */
-.wave { flex: none; width: 52px; height: 24px; display: none; }
-.pill[data-state="live"] .wave { display: block; }
-.ctl { flex: none; display: flex; gap: 8px; align-items: center; }
-.round-btn {
-  width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
-  background: var(--on-pill-fill); color: var(--on-pill);
-  transition: background 0.2s, scale 0.2s var(--spring);
-}
-.round-btn:hover { background: var(--on-pill-faint); }
-.round-btn:active { scale: 0.92; }
-.round-btn svg { width: 18px; height: 18px; }
-.round-btn[aria-pressed="true"] { background: var(--on-pill); color: var(--pill); }
-.round-btn.hang { background: var(--danger); color: #fff; }
-.round-btn.hang:hover { background: color-mix(in srgb, var(--danger) 85%, #fff); }
-.start {
-  height: 40px; padding: 0 18px; border-radius: 999px; background: var(--heat); color: #fff;
-  font-weight: 600; font-size: 14px; letter-spacing: -0.005em; white-space: nowrap;
-  transition: background 0.2s, scale 0.2s var(--spring);
-}
-.start:hover { background: color-mix(in srgb, var(--heat) 88%, #fff); }
-.start:active { scale: 0.96; }
-.start:disabled { opacity: 0.5; cursor: default; }
+:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 [hidden] { display: none !important; }
 
-/* body */
-.body { min-height: 0; overflow: hidden; }
-.body-inner { padding: 12px 4px 0; display: flex; flex-direction: column; gap: 12px; }
-.pill:not([data-state="live"]):not([data-state="ended"]) .body-inner { visibility: hidden; }
-
-.captions { display: flex; flex-direction: column; gap: 4px; min-height: 0; }
-.captions:empty { display: none; }
-.cap {
-  font-size: 14px; line-height: 1.4; color: var(--on-pill); letter-spacing: -0.005em;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-  animation: rise 0.35s var(--ease) both;
+.call {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: var(--space-lg) max(var(--space-md), env(safe-area-inset-right, 0px)) var(--space-2xl) max(var(--space-md), env(safe-area-inset-left, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
 }
-.cap:not(:last-child) { color: var(--on-pill-muted); }
-.cap.you::before {
-  content: "You"; display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px;
-  font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em; line-height: 17px; vertical-align: 1px;
-  background: var(--on-pill-fill); color: var(--on-pill-muted);
+
+/* ── status bar ─────────────────────────────── */
+.bar {
+  display: flex; align-items: center; gap: var(--space-sm);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--color-rule);
+  min-height: 48px;
 }
-@keyframes rise { from { opacity: 0; translate: 0 4px; } }
-
-.chips { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
-.chips:empty { display: none; }
-.chip {
-  display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px;
-  font-size: 12px; font-weight: 520; color: var(--on-pill-muted); background: var(--on-pill-fill);
-  max-width: 100%; transition: background 0.3s, color 0.3s, box-shadow 0.3s;
+.tally {
+  width: 10px; height: 10px; border-radius: 50%; flex: none;
+  background: var(--color-ink-3);
+  transition: background var(--dur-med) var(--ease-out), box-shadow var(--dur-med) var(--ease-out);
 }
-.chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chip svg { width: 12px; height: 12px; flex: none; display: none; }
-.chip[data-s="current"] { color: var(--on-pill); box-shadow: inset 0 0 0 1px var(--on-pill-faint); }
-.chip[data-s="done"] { color: var(--on-pill); }
-.chip[data-s="done"] .ok { display: block; color: var(--success); }
-.chip[data-s="parked"] { background: transparent; box-shadow: inset 0 0 0 1px var(--on-pill-faint); }
-.chip[data-s="parked"] .park { display: block; }
-.chip[data-s="done"] .ok, .chip[data-s="parked"] .park { animation: pop 0.4s var(--spring); }
-@keyframes pop { from { scale: 0.3; opacity: 0; } }
-
-.thinking {
-  align-self: flex-start; height: 26px; padding: 0 11px; border-radius: 999px; display: inline-flex; align-items: center;
-  font-size: 12px; font-weight: 560; color: var(--on-pill-muted);
-  background:
-    linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.14) 50%, transparent 70%) 0 0 / 220% 100% no-repeat,
-    var(--on-pill-fill);
-  animation: shimmer 1.8s linear infinite;
+.call[data-state="live"] .tally { background: var(--color-tally); box-shadow: 0 0 0 4px var(--color-tally-soft); }
+.call[data-state="live"].is-thinking .tally { background: var(--color-wait); box-shadow: none; }
+.brand { font: 500 var(--text-sm)/1 var(--font-mono); letter-spacing: 0.02em; }
+.status {
+  flex: 1; min-width: 0;
+  font: 400 var(--text-sm)/1.2 var(--font-mono); color: var(--color-ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-@keyframes shimmer { from { background-position: 120% 0, 0 0; } to { background-position: -120% 0, 0 0; } }
+.call[data-state="live"] .status { color: var(--color-ink); }
+.ctl { display: flex; gap: var(--space-xs); flex: none; }
+.btn {
+  height: 36px; padding: 0 var(--space-sm);
+  display: inline-flex; align-items: center; gap: var(--space-xs);
+  border-radius: var(--radius-sm);
+  font: 500 var(--text-sm)/1 var(--font-body);
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.btn svg { width: 16px; height: 16px; flex: none; }
+.btn:active { transform: translateY(1px); }
+.btn-quiet { box-shadow: inset 0 0 0 1px var(--color-rule); }
+.btn-quiet:hover { background: var(--color-paper-2); }
+.btn-quiet[aria-pressed="true"] { background: var(--color-ink); color: var(--color-paper); box-shadow: none; }
+.btn-hang { background: var(--color-tally); color: var(--color-on-tally); }
+.btn-hang:hover { background: color-mix(in oklch, var(--color-tally) 88%, black); }
 
-.err { font-size: 12.5px; color: var(--danger); }
+/* ── level meters ───────────────────────────── */
+.meters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-md); margin-top: calc(-1 * var(--space-md)); }
+.meter { display: flex; align-items: center; gap: var(--space-xs); font: 400 var(--text-xs)/1 var(--font-mono); color: var(--color-ink-3); }
+.meter span { flex: none; width: 3.25rem; }
+.meter .track { flex: 1; height: 3px; border-radius: 2px; background: var(--color-rule); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--color-ink); transform-origin: left; transform: scaleX(0); }
+.meter.you i { background: var(--color-ink-2); }
 
-@media (max-width: 380px) {
-  body { padding: 12px 8px; }
-  .pill[data-state="live"] .wave { display: none; }
-  .head { gap: 10px; }
+/* ── the question on air ────────────────────── */
+.now { display: flex; flex-direction: column; gap: var(--space-sm); }
+.ord { margin: 0; font: 500 var(--text-xs)/1 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-ink-3); font-variant-numeric: tabular-nums; }
+.q {
+  margin: 0;
+  font: 550 var(--text-q)/1.18 var(--font-display);
+  font-style: normal;
+  letter-spacing: -0.012em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.rec { margin: 0; font-size: var(--text-md); color: var(--color-ink-2); max-width: 60ch; }
+.rec b { font-weight: 600; color: var(--color-ink); }
+
+/* ── what was just said ─────────────────────── */
+.lines { display: flex; flex-direction: column; gap: var(--space-xs); padding-left: var(--space-md); border-left: 2px solid var(--color-rule); }
+.lines:empty { display: none; }
+.say { margin: 0; font-size: var(--text-md); line-height: 1.45; color: var(--color-ink-2); animation: fade var(--dur-med) var(--ease-out) both; }
+.say:last-child { color: var(--color-ink); }
+.say b { font: 500 var(--text-xs)/1 var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-ink-3); margin-right: var(--space-xs); }
+@keyframes fade { from { opacity: 0; } }
+
+/* ── ledger of the round ────────────────────── */
+.ledger { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-rule); }
+.ledger:empty { display: none; }
+.row {
+  display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) auto; column-gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-rule);
+}
+.row .n { font: 400 var(--text-sm)/1.5 var(--font-mono); color: var(--color-ink-3); font-variant-numeric: tabular-nums; }
+.row .t { font-size: var(--text-md); line-height: 1.45; min-width: 0; }
+.row .a { grid-column: 2 / 4; margin-top: var(--space-2xs); font-size: var(--text-sm); color: var(--color-ink-2); }
+.row .a q { font-family: var(--font-display); font-size: var(--text-md); color: var(--color-ink-2); }
+.row .s { font: 500 var(--text-xs)/1.5 var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-ink-3); white-space: nowrap; }
+.row[data-s="pending"] .t { color: var(--color-ink-3); }
+.row[data-s="current"] .n, .row[data-s="current"] .s { color: var(--color-tally); }
+.row[data-s="current"] .t { font-weight: 500; }
+.row[data-s="done"] .s { color: var(--color-done); }
+.row[data-s="parked"] .s { color: var(--color-wait-ink); }
+
+/* ── idle / ended ───────────────────────────── */
+.pickup { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-md); }
+.lead { margin: 0; font: 550 var(--text-q)/1.2 var(--font-display); letter-spacing: -0.012em; text-wrap: balance; overflow-wrap: anywhere; min-width: 0; }
+.lead .topic { color: var(--color-ink-2); }
+.btn-pick {
+  height: 44px; padding: 0 var(--space-lg);
+  background: var(--color-ink); color: var(--color-paper);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-md);
+}
+.btn-pick:hover { background: color-mix(in oklch, var(--color-ink) 86%, var(--color-paper)); }
+.btn-pick:disabled { opacity: 0.55; cursor: default; transform: none; }
+.btn-pick .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-tally); }
+.hint { margin: 0; font: 400 var(--text-xs)/1.4 var(--font-mono); color: var(--color-ink-3); }
+.err { margin: 0; font-size: var(--text-sm); color: var(--color-tally); }
+.err:empty { display: none; }
+
+@media (max-width: 430px) {
+  .call { gap: var(--space-lg); padding-top: var(--space-md); }
+  .btn .label { display: none; }
+  .ctl .btn { width: 36px; padding: 0; justify-content: center; }
+  .meters { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
 }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-  .avatar { scale: 1 !important; }
+  *, *::before, *::after { animation: none !important; transition-duration: 1ms !important; }
 }
 </style>
 </head>
 <body>
-<section class="pill" id="pill" data-state="idle" data-mode="listening" aria-label="Hotseat call">
-  <div class="head">
-    <div class="avatar" id="avatar" aria-hidden="true"></div>
-    <div class="who">
-      <div class="title">Hotseat</div>
-      <div class="sub" id="sub" aria-live="polite"></div>
-    </div>
-    <canvas class="wave" id="wave" aria-hidden="true"></canvas>
+<main class="call" id="call" data-state="idle" data-mode="listening" aria-label="Hotseat call">
+  <header class="bar">
+    <span class="tally" aria-hidden="true"></span>
+    <span class="brand">hotseat</span>
+    <span class="status" id="status" aria-live="polite">Not on a call</span>
     <div class="ctl">
-      <button class="start" id="start" type="button">Start call</button>
-      <button class="round-btn" id="mute" type="button" aria-label="Mute" aria-pressed="false" hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path class="slash" d="M4 4l16 16" hidden/></svg>
+      <button class="btn btn-quiet" id="mute" type="button" aria-pressed="false" aria-label="Mute" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path class="slash" d="M4 4l16 16" hidden/></svg>
+        <span class="label" id="mute-label">Mute</span>
       </button>
-      <button class="round-btn hang" id="hang" type="button" aria-label="Hang up" hidden>
+      <button class="btn btn-hang" id="hang" type="button" aria-label="Hang up" hidden>
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 9.5c-2.9 0-5.6.8-7.9 2.3-.7.4-1 1.2-.9 2l.3 1.7c.1.7.8 1.2 1.5 1.1l2.9-.5c.6-.1 1.1-.6 1.2-1.2l.3-1.9c1.7-.5 3.5-.5 5.2 0l.3 1.9c.1.6.6 1.1 1.2 1.2l2.9.5c.7.1 1.4-.4 1.5-1.1l.3-1.7c.1-.8-.2-1.6-.9-2-2.3-1.5-5-2.3-7.9-2.3z"/></svg>
+        <span class="label">Hang up</span>
       </button>
     </div>
+  </header>
+
+  <div class="meters" id="meters" aria-hidden="true" hidden>
+    <div class="meter"><span>Claude</span><div class="track"><i id="lv-out"></i></div></div>
+    <div class="meter you"><span>You</span><div class="track"><i id="lv-in"></i></div></div>
   </div>
-  <div class="body">
-    <div class="body-inner">
-      <div class="captions" id="captions" aria-live="polite"></div>
-      <div class="thinking" id="thinking" hidden>Claude is thinking</div>
-      <ul class="chips" id="chips" aria-label="Questions"></ul>
-    </div>
-  </div>
-</section>
+
+  <section class="pickup" id="pickup">
+    <p class="lead" id="lead">Waiting for Claude's questions.</p>
+    <button class="btn btn-pick" id="start" type="button"><span class="dot" aria-hidden="true"></span><span id="start-label">Pick up</span></button>
+    <p class="err" id="err" role="alert"></p>
+    <p class="hint">Say "you decide", "park it" or "go back" any time.</p>
+  </section>
+
+  <section class="now" id="now" hidden>
+    <p class="ord" id="ord"></p>
+    <h1 class="q" id="q"></h1>
+    <p class="rec" id="rec"></p>
+  </section>
+
+  <div class="lines" id="lines" aria-live="polite"></div>
+
+  <ol class="ledger" id="ledger" aria-label="Questions this round"></ol>
+</main>
 
 <script type="module">
 import { Conversation } from 'https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.28.0/+esm';
 
 const $ = (id) => document.getElementById(id);
-const pill = $('pill');
+const call = $('call');
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 // Call state
@@ -214,11 +261,14 @@ let muted = false;
 let inCall = false;       // startSession resolved and not yet hung up
 let live = false;         // POST /api/call {live:true} done: events go straight to the agent
 const queue = [];         // SSE events waiting for a live session
+let callStartedAt = 0;
+let lastCall = null;      // { answered, total, secs } for the ended screen
 
 // Round state (what the agent currently knows)
 let round = null;         // { roundId, topic, round, questions[], context }
 let status = {};          // questionId -> 'done' | 'parked'
-let thinking = false;
+let answers = {};         // questionId -> { answer, quote } | { reason }
+let thinking = false, thinkingSince = 0;
 let ending = false, endSawSpeaking = false, endTimer = 0;
 const delivered = new Set(); // roundIds already sent to the agent
 
@@ -228,131 +278,139 @@ const post = (path, body) => fetch(path, {
   body: JSON.stringify(body),
 });
 const beacon = (path, body) => navigator.sendBeacon(path, new Blob([JSON.stringify(body)], { type: 'application/json' }));
+const clock = (ms) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+const el = (tag, cls, text) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+};
 
 // ---------- UI ----------
 
 function setState(state) {
-  pill.dataset.state = state;
+  call.dataset.state = state;
   const isLive = state === 'live';
-  $('start').hidden = isLive || state === 'connecting';
-  $('mute').hidden = $('hang').hidden = !isLive;
-  if (state === 'connecting') setSub('Connecting…');
-  else if (state === 'ended') setSub('Call ended');
-  else if (state === 'idle') setSub('');
-  else renderSub();
+  $('pickup').hidden = isLive;
+  $('mute').hidden = $('hang').hidden = $('meters').hidden = !isLive;
+  $('start').disabled = state === 'connecting';
+  $('start-label').textContent = state === 'connecting' ? 'Connecting…' : state === 'ended' ? 'Call back' : 'Pick up';
   if (isLive) startMeter(); else stopMeter();
+  render();
 }
 
-function setSub(text, error = false) {
-  $('sub').textContent = text;
-  $('sub').classList.toggle('err', error);
+function setError(text) { $('err').textContent = text || ''; }
+
+// The round the page shows: the live one, else the one waiting in the queue.
+const shownRound = () => round ?? queue.find((e) => e.type === 'round')?.data ?? null;
+
+function render() {
+  const state = call.dataset.state;
+  const r = shownRound();
+  call.classList.toggle('is-thinking', thinking);
+
+  // status bar
+  let s = 'Not on a call';
+  if (state === 'connecting') s = 'Connecting…';
+  else if (state === 'live') s = thinking ? `Claude is working · ${clock(Date.now() - thinkingSince)}` : `On air · ${clock(Date.now() - callStartedAt)}`;
+  else if (state === 'ended' && lastCall) s = `Call ended · ${clock(lastCall.secs * 1000)}`;
+  $('status').textContent = s;
+
+  // idle / ended lead
+  if (state !== 'live') {
+    const lead = $('lead');
+    lead.replaceChildren();
+    if (state === 'ended' && lastCall) {
+      lead.append(`${lastCall.answered} of ${lastCall.total} answered.`);
+    } else if (r) {
+      const n = r.questions.length;
+      lead.append(`Claude has ${n} question${n === 1 ? '' : 's'} `, el('span', 'topic', `about ${r.topic}.`));
+    } else {
+      lead.append("Waiting for Claude's questions.");
+    }
+  }
+
+  // the question on air
+  const now = $('now');
+  now.hidden = state !== 'live' || !r;
+  if (!now.hidden) {
+    const qs = r.questions;
+    const idx = qs.findIndex((q) => !status[q.id]);
+    $('rec').replaceChildren();
+    if (thinking || idx === -1) {
+      $('ord').textContent = `Round ${r.round}`;
+      $('q').textContent = thinking ? 'Claude is working on your answers.' : "That's the round. Passing it to Claude.";
+    } else {
+      const q = qs[idx];
+      $('ord').textContent = `Round ${r.round} · Question ${idx + 1} of ${qs.length}`;
+      $('q').textContent = q.question;
+      if (q.recommendation) $('rec').append(el('b', null, 'Claude suggests '), q.recommendation);
+    }
+  }
+
+  renderLedger(r, state);
 }
 
-function renderSub() {
-  if (pill.dataset.state !== 'live') return;
-  if (!round) return setSub('');
-  const qs = round.questions;
-  const open = qs.findIndex((q) => !status[q.id]);
-  const k = open === -1 ? qs.length : open + 1;
-  setSub(`Round ${round.round} · question ${k} of ${qs.length}`);
-}
-
-function renderChips() {
-  const qs = round?.questions ?? [];
-  const current = qs.find((q) => !status[q.id])?.id;
-  $('chips').replaceChildren(...qs.map((q) => {
-    const s = status[q.id] || (q.id === current && !thinking ? 'current' : 'pending');
-    const li = document.createElement('li');
-    li.className = 'chip';
+function renderLedger(r, state) {
+  const qs = r?.questions ?? [];
+  const current = state === 'live' && !thinking ? qs.find((q) => !status[q.id])?.id : null;
+  $('ledger').replaceChildren(...qs.map((q, i) => {
+    const s = status[q.id] || (q.id === current ? 'current' : 'pending');
+    const li = el('li', 'row');
     li.dataset.s = s;
-    li.title = q.question || q.title;
-    li.innerHTML =
-      '<svg class="ok" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.2l2.3 2.3 4.7-5"/></svg>' +
-      '<svg class="park" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><rect x="3" y="2.5" width="2" height="7" rx="0.6"/><rect x="7" y="2.5" width="2" height="7" rx="0.6"/></svg>' +
-      '<span></span><em class="sr"></em>';
-    li.querySelector('span').textContent = q.title || q.id;
-    li.querySelector('em').textContent = s === 'done' ? ', settled' : s === 'parked' ? ', parked' : '';
+    li.append(
+      el('span', 'n', `Q${i + 1}`),
+      el('span', 't', q.title || q.question),
+      el('span', 's', { done: 'Settled', parked: 'Parked', current: 'Asking', pending: '' }[s]),
+    );
+    const a = answers[q.id];
+    if (s === 'done' && a) {
+      const line = el('div', 'a', a.answer + ' ');
+      if (a.quote) line.append(el('q', null, a.quote));
+      li.append(line);
+    } else if (s === 'parked' && a?.reason) {
+      li.append(el('div', 'a', a.reason));
+    }
     return li;
   }));
-  $('thinking').hidden = !thinking;
-  renderSub();
 }
 
 function caption(source, text) {
   text = String(text ?? '').trim();
   if (!text || text.startsWith('[CLAUDE]')) return;
-  const d = document.createElement('div');
-  d.className = source === 'user' ? 'cap you' : 'cap';
-  d.textContent = text;
-  const box = $('captions');
-  box.append(d);
-  while (box.children.length > 3) box.firstElementChild.remove();
+  const p = el('p', 'say');
+  p.append(el('b', null, source === 'user' ? 'You' : 'Hotseat'), text);
+  const box = $('lines');
+  box.append(p);
+  while (box.children.length > 2) box.firstElementChild.remove();
 }
 
-// ---------- meter: avatar + waveform ----------
+// Tick the clocks in the status bar once a second while on a call.
+setInterval(() => { if (call.dataset.state === 'live') render(); }, 1000);
 
-const wave = $('wave');
-const wctx = wave.getContext('2d');
-const BARS = 13;
-const samples = Array.from({ length: BARS }, () => ({ v: 0, out: false }));
-let raf = 0, lastPush = 0, avatarLevel = 0, colors = {};
+// ---------- level meters ----------
 
-function readColors() {
-  const cs = getComputedStyle(document.documentElement);
-  colors = { heat: cs.getPropertyValue('--heat').trim(), fg: cs.getPropertyValue('--on-pill').trim(), faint: cs.getPropertyValue('--on-pill-faint').trim() };
-}
-readColors();
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
-
-function sizeWave() {
-  const dpr = window.devicePixelRatio || 1;
-  const { width, height } = wave.getBoundingClientRect();
-  wave.width = Math.round(width * dpr);
-  wave.height = Math.round(height * dpr);
-  wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-
-function drawWave() {
-  const w = wave.clientWidth, h = wave.clientHeight;
-  if (!w) return;
-  wctx.clearRect(0, 0, w, h);
-  const gap = 2, bw = (w - gap * (BARS - 1)) / BARS;
-  samples.forEach((s, i) => {
-    const bh = Math.max(3, s.v * h);
-    wctx.fillStyle = s.v < 0.04 ? colors.faint : s.out ? colors.heat : colors.fg;
-    wctx.beginPath();
-    wctx.roundRect(i * (bw + gap), (h - bh) / 2, bw, bh, bw / 2);
-    wctx.fill();
-  });
-}
-
-const shape = (v) => Math.min(1, Math.sqrt(Math.max(0, v)) * 1.25);
-
-function meter(t) {
+let raf = 0, outLevel = 0, inLevel = 0;
+const shape = (v) => Math.min(1, Math.sqrt(Math.max(0, v)) * 1.3);
+function meter() {
   const out = shape(conversation?.getOutputVolume?.() ?? 0);
   const inp = muted ? 0 : shape(conversation?.getInputVolume?.() ?? 0);
-  avatarLevel += (out - avatarLevel) * (out > avatarLevel ? 0.35 : 0.08);
-  $('avatar').style.setProperty('--level', reduceMotion.matches ? 0 : avatarLevel.toFixed(3));
-  if (t - lastPush > 55) {
-    lastPush = t;
-    samples.shift();
-    samples.push({ v: Math.max(out, inp), out: out >= inp });
-    drawWave();
-  }
+  const k = reduceMotion.matches ? 1 : 0.35;
+  outLevel += (out - outLevel) * (out > outLevel ? k : k / 3);
+  inLevel += (inp - inLevel) * (inp > inLevel ? k : k / 3);
+  $('lv-out').style.transform = `scaleX(${outLevel.toFixed(3)})`;
+  $('lv-in').style.transform = `scaleX(${inLevel.toFixed(3)})`;
   raf = requestAnimationFrame(meter);
 }
-
-function startMeter() {
-  cancelAnimationFrame(raf);
-  requestAnimationFrame(() => { sizeWave(); raf = requestAnimationFrame(meter); });
-}
+function startMeter() { cancelAnimationFrame(raf); raf = requestAnimationFrame(meter); }
 function stopMeter() {
   cancelAnimationFrame(raf);
-  avatarLevel = 0;
-  $('avatar').style.setProperty('--level', 0);
-  samples.forEach((s) => { s.v = 0; });
+  outLevel = inLevel = 0;
+  $('lv-out').style.transform = $('lv-in').style.transform = 'scaleX(0)';
 }
-addEventListener('resize', () => { if (pill.dataset.state === 'live') { sizeWave(); drawWave(); } });
 
 // ---------- events from Claude Code ----------
 
@@ -370,12 +428,12 @@ function deliver(ev) {
     delivered.add(ev.data.roundId);
     round = ev.data;
     status = {};
+    answers = {};
     thinking = false;
-    renderChips();
   } else if (ev.type === 'thinking') {
     if (thinking) return;
     thinking = true;
-    renderChips();
+    thinkingSince = Date.now();
   } else if (ev.type === 'end') {
     if (ending) return;
     ending = true;
@@ -383,6 +441,7 @@ function deliver(ev) {
     clearTimeout(endTimer);
     endTimer = setTimeout(() => conversation?.endSession(), 10_000);
   }
+  render();
   conversation.sendUserMessage(frame(ev));
 }
 
@@ -391,11 +450,12 @@ function onEvent(ev) {
   if (ev.type === 'end') {
     // Nobody is on the call: there is nothing to say goodbye to.
     queue.length = 0;
-    return;
+    return render();
   }
   if (ev.type === 'round' && (delivered.has(ev.data.roundId) || queue.some((q) => q.type === 'round' && q.data.roundId === ev.data.roundId))) return;
   if (ev.type === 'thinking' && queue.at(-1)?.type === 'thinking') return;
   queue.push(ev);
+  render();
 }
 
 function flush() {
@@ -424,7 +484,8 @@ async function record(path, body, questionId, mark, ok) {
     }
     if (round?.roundId === roundId) {
       status[questionId] = mark;
-      renderChips();
+      answers[questionId] = body;
+      render();
     }
     return ok;
   } catch (e) {
@@ -451,6 +512,10 @@ function hangup() {
 
 function onDisconnect() {
   const wasInCall = inCall;
+  if (wasInCall) {
+    const qs = round?.questions ?? [];
+    lastCall = { answered: qs.filter((q) => status[q.id] === 'done').length, total: qs.length, secs: Math.round((Date.now() - callStartedAt) / 1000) };
+  }
   hangup();
   clearTimeout(endTimer);
   conversation = null;
@@ -458,17 +523,15 @@ function onDisconnect() {
   thinking = false;
   muted = false;
   setMuteUi();
-  renderChips();
-  // Chips stay visible as the record of the call until the next start.
-  if (wasInCall) setState('ended');
+  if (wasInCall) setState('ended'); else render();
 }
 
 async function start() {
   if (starting || conversation) return;
   starting = true;
-  $('captions').replaceChildren();
-  round = null; status = {}; thinking = false;
-  renderChips();
+  setError('');
+  $('lines').replaceChildren();
+  round = null; status = {}; answers = {}; thinking = false;
   setState('connecting');
   try {
     await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -480,7 +543,7 @@ async function start() {
       clientTools,
       onDisconnect,
       onModeChange: ({ mode }) => {
-        pill.dataset.mode = mode;
+        call.dataset.mode = mode;
         if (!ending) return;
         if (mode === 'speaking') endSawSpeaking = true;
         else if (mode === 'listening' && endSawSpeaking) conversation?.endSession();
@@ -491,15 +554,15 @@ async function start() {
     // onConnect fires before startSession resolves; from here on only the resolved object is used.
     conversation = c;
     inCall = true;
+    callStartedAt = Date.now();
     setState('live');
-    renderChips();
     await post('/api/call', { live: true }).catch(() => {});
     if (!inCall) return; // hung up while the POST was in flight
     live = true;
     flush();
   } catch (e) {
-    setState('idle');
-    setSub(e?.name === 'NotAllowedError' ? 'Allow the microphone to start.' : String(e?.message || e), true);
+    setState(lastCall ? 'ended' : 'idle');
+    setError(e?.name === 'NotAllowedError' ? 'Allow the microphone to pick up.' : String(e?.message || e));
   } finally {
     starting = false;
   }
@@ -509,6 +572,7 @@ function setMuteUi() {
   const b = $('mute');
   b.setAttribute('aria-pressed', String(muted));
   b.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+  $('mute-label').textContent = muted ? 'Unmute' : 'Mute';
   b.querySelector('.slash').toggleAttribute('hidden', !muted);
 }
 
@@ -526,6 +590,8 @@ addEventListener('beforeunload', () => {
   beacon('/api/hangup', {});
   beacon('/api/call', { live: false });
 });
+
+render();
 </script>
 </body>
 </html>
