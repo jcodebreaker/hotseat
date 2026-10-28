@@ -1,0 +1,18 @@
+{
+  "name": "hotseat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Answer Claude Code's questions out loud on a voice call.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.9"
+  },
+  "scripts": {
+    "setup": "node --env-file=.env setup.mjs",
+    "check": "node scripts/check.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1"
+  }
+}

@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Hotseat</title>
+<style>
+:root {
+  --bg: #f5f4f1;
+  --pill: #0c0c0d;
+  --pill-edge: rgba(255, 255, 255, 0);
+  --pill-shadow: 0 18px 50px -20px rgba(12, 12, 13, 0.55), 0 2px 6px rgba(12, 12, 13, 0.12);
+  --on-pill: #f4f4f5;
+  --on-pill-muted: rgba(244, 244, 245, 0.56);
+  --on-pill-faint: rgba(244, 244, 245, 0.16);
+  --on-pill-fill: rgba(255, 255, 255, 0.08);
+  --heat: #ff6a1a;
+  --heat-deep: #b83a00;
+  --heat-glow: rgba(255, 106, 26, 0.35);
+  --danger: #ff453a;
+  --success: #34c759;
+  --focus: #ff8a47;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, Roboto, sans-serif;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #09090a;
+    --pill: #18181a;
+    --pill-edge: rgba(255, 255, 255, 0.07);
+    --pill-shadow: 0 18px 60px -24px rgba(0, 0, 0, 0.9);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--on-pill);
+  font: 14px/1.4 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  padding: 20px 12px;
+  display: flex;
+  justify-content: center;
+}
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* pill */
+.pill {
+  width: min(100%, 520px);
+  background: var(--pill);
+  box-shadow: inset 0 0 0 1px var(--pill-edge), var(--pill-shadow);
+  border-radius: 30px;
+  padding: 10px;
+  display: grid;
+  grid-template-rows: auto 0fr;
+  transition: width 0.55s var(--ease), border-radius 0.55s var(--ease), grid-template-rows 0.55s var(--ease), padding 0.55s var(--ease);
+}
+.pill[data-state="idle"], .pill[data-state="connecting"] { width: min(100%, 300px); }
+.pill[data-state="live"], .pill[data-state="ended"] { grid-template-rows: auto 1fr; border-radius: 28px; padding: 12px 12px 14px; }
+
+.head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.who { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; min-height: 40px; }
+.title { font-size: 15px; font-weight: 620; letter-spacing: -0.015em; line-height: 1.2; }
+.sub {
+  font-size: 12.5px; color: var(--on-pill-muted); font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.35;
+}
+.sub:empty { display: none; }
+
+/* avatar */
+.avatar {
+  --level: 0;
+  flex: none; width: 40px; height: 40px; border-radius: 50%; position: relative;
+  background: radial-gradient(circle at 50% 34%, #ffb27a 0%, var(--heat) 42%, var(--heat-deep) 100%);
+  box-shadow: 0 0 0 calc(var(--level) * 7px) var(--heat-glow), 0 0 calc(10px + var(--level) * 18px) -4px var(--heat);
+  scale: calc(1 + var(--level) * 0.1);
+  transition: filter 0.5s var(--ease), opacity 0.5s var(--ease);
+}
+.pill[data-state="idle"] .avatar, .pill[data-state="ended"] .avatar { filter: saturate(0.25) brightness(0.8); opacity: 0.7; }
+.pill[data-state="connecting"] .avatar { animation: pulse 1.4s ease-in-out infinite; }
+.pill[data-state="live"][data-mode="listening"] .avatar { animation: breathe 3.6s ease-in-out infinite; }
+@keyframes breathe { 50% { filter: brightness(1.12); } }
+@keyframes pulse { 50% { opacity: 0.45; scale: 0.92; } }
+
+/* waveform + controls */
+.wave { flex: none; width: 52px; height: 24px; display: none; }
+.pill[data-state="live"] .wave { display: block; }
+.ctl { flex: none; display: flex; gap: 8px; align-items: center; }
+.round-btn {
+  width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--on-pill-fill); color: var(--on-pill);
+  transition: background 0.2s, scale 0.2s var(--spring);
+}
+.round-btn:hover { background: var(--on-pill-faint); }
+.round-btn:active { scale: 0.92; }
+.round-btn svg { width: 18px; height: 18px; }
+.round-btn[aria-pressed="true"] { background: var(--on-pill); color: var(--pill); }
+.round-btn.hang { background: var(--danger); color: #fff; }
+.round-btn.hang:hover { background: color-mix(in srgb, var(--danger) 85%, #fff); }
+.start {
+  height: 40px; padding: 0 18px; border-radius: 999px; background: var(--heat); color: #fff;
+  font-weight: 600; font-size: 14px; letter-spacing: -0.005em; white-space: nowrap;
+  transition: background 0.2s, scale 0.2s var(--spring);
+}
+.start:hover { background: color-mix(in srgb, var(--heat) 88%, #fff); }
+.start:active { scale: 0.96; }
+.start:disabled { opacity: 0.5; cursor: default; }
+[hidden] { display: none !important; }
+
+/* body */
+.body { min-height: 0; overflow: hidden; }
+.body-inner { padding: 12px 4px 0; display: flex; flex-direction: column; gap: 12px; }
+.pill:not([data-state="live"]):not([data-state="ended"]) .body-inner { visibility: hidden; }
+
+.captions { display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+.captions:empty { display: none; }
+.cap {
+  font-size: 14px; line-height: 1.4; color: var(--on-pill); letter-spacing: -0.005em;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  animation: rise 0.35s var(--ease) both;
+}
+.cap:not(:last-child) { color: var(--on-pill-muted); }
+.cap.you::before {
+  content: "You"; display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px;
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em; line-height: 17px; vertical-align: 1px;
+  background: var(--on-pill-fill); color: var(--on-pill-muted);
+}
+@keyframes rise { from { opacity: 0; translate: 0 4px; } }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.chips:empty { display: none; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 520; color: var(--on-pill-muted); background: var(--on-pill-fill);
+  max-width: 100%; transition: background 0.3s, color 0.3s, box-shadow 0.3s;
+}
+.chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip svg { width: 12px; height: 12px; flex: none; display: none; }
+.chip[data-s="current"] { color: var(--on-pill); box-shadow: inset 0 0 0 1px var(--on-pill-faint); }
+.chip[data-s="done"] { color: var(--on-pill); }
+.chip[data-s="done"] .ok { display: block; color: var(--success); }
+.chip[data-s="parked"] { background: transparent; box-shadow: inset 0 0 0 1px var(--on-pill-faint); }
+.chip[data-s="parked"] .park { display: block; }
+.chip[data-s="done"] .ok, .chip[data-s="parked"] .park { animation: pop 0.4s var(--spring); }
+@keyframes pop { from { scale: 0.3; opacity: 0; } }
+
+.thinking {
+  align-self: flex-start; height: 26px; padding: 0 11px; border-radius: 999px; display: inline-flex; align-items: center;
+  font-size: 12px; font-weight: 560; color: var(--on-pill-muted);
+  background:
+    linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.14) 50%, transparent 70%) 0 0 / 220% 100% no-repeat,
+    var(--on-pill-fill);
+  animation: shimmer 1.8s linear infinite;
+}
+@keyframes shimmer { from { background-position: 120% 0, 0 0; } to { background-position: -120% 0, 0 0; } }
+
+.err { font-size: 12.5px; color: var(--danger); }
+
+@media (max-width: 380px) {
+  body { padding: 12px 8px; }
+  .pill[data-state="live"] .wave { display: none; }
+  .head { gap: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .avatar { scale: 1 !important; }
+}
+</style>
+</head>
+<body>
+<section class="pill" id="pill" data-state="idle" data-mode="listening" aria-label="Hotseat call">
+  <div class="head">
+    <div class="avatar" id="avatar" aria-hidden="true"></div>
+    <div class="who">
+      <div class="title">Hotseat</div>
+      <div class="sub" id="sub" aria-live="polite"></div>
+    </div>
+    <canvas class="wave" id="wave" aria-hidden="true"></canvas>
+    <div class="ctl">
+      <button class="start" id="start" type="button">Start call</button>
+      <button class="round-btn" id="mute" type="button" aria-label="Mute" aria-pressed="false" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path class="slash" d="M4 4l16 16" hidden/></svg>
+      </button>
+      <button class="round-btn hang" id="hang" type="button" aria-label="Hang up" hidden>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 9.5c-2.9 0-5.6.8-7.9 2.3-.7.4-1 1.2-.9 2l.3 1.7c.1.7.8 1.2 1.5 1.1l2.9-.5c.6-.1 1.1-.6 1.2-1.2l.3-1.9c1.7-.5 3.5-.5 5.2 0l.3 1.9c.1.6.6 1.1 1.2 1.2l2.9.5c.7.1 1.4-.4 1.5-1.1l.3-1.7c.1-.8-.2-1.6-.9-2-2.3-1.5-5-2.3-7.9-2.3z"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="body">
+    <div class="body-inner">
+      <div class="captions" id="captions" aria-live="polite"></div>
+      <div class="thinking" id="thinking" hidden>Claude is thinking</div>
+      <ul class="chips" id="chips" aria-label="Questions"></ul>
+    </div>
+  </div>
+</section>
+
+<script type="module">
+import { Conversation } from 'https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.28.0/+esm';
+
+const $ = (id) => document.getElementById(id);
+const pill = $('pill');
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+// Call state
+let conversation = null;  // only ever the object startSession resolved with
+let starting = false;
+let muted = false;
+let inCall = false;       // startSession resolved and not yet hung up
+let live = false;         // POST /api/call {live:true} done: events go straight to the agent
+const queue = [];         // SSE events waiting for a live session
+
+// Round state (what the agent currently knows)
+let round = null;         // { roundId, topic, round, questions[], context }
+let status = {};          // questionId -> 'done' | 'parked'
+let thinking = false;
+let ending = false, endSawSpeaking = false, endTimer = 0;
+const delivered = new Set(); // roundIds already sent to the agent
+
+const post = (path, body) => fetch(path, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify(body),
+});
+const beacon = (path, body) => navigator.sendBeacon(path, new Blob([JSON.stringify(body)], { type: 'application/json' }));
+
+// ---------- UI ----------
+
+function setState(state) {
+  pill.dataset.state = state;
+  const isLive = state === 'live';
+  $('start').hidden = isLive || state === 'connecting';
+  $('mute').hidden = $('hang').hidden = !isLive;
+  if (state === 'connecting') setSub('Connecting…');
+  else if (state === 'ended') setSub('Call ended');
+  else if (state === 'idle') setSub('');
+  else renderSub();
+  if (isLive) startMeter(); else stopMeter();
+}
+
+function setSub(text, error = false) {
+  $('sub').textContent = text;
+  $('sub').classList.toggle('err', error);
+}
+
+function renderSub() {
+  if (pill.dataset.state !== 'live') return;
+  if (!round) return setSub('');
+  const qs = round.questions;
+  const open = qs.findIndex((q) => !status[q.id]);
+  const k = open === -1 ? qs.length : open + 1;
+  setSub(`Round ${round.round} · question ${k} of ${qs.length}`);
+}
+
+function renderChips() {
+  const qs = round?.questions ?? [];
+  const current = qs.find((q) => !status[q.id])?.id;
+  $('chips').replaceChildren(...qs.map((q) => {
+    const s = status[q.id] || (q.id === current && !thinking ? 'current' : 'pending');
+    const li = document.createElement('li');
+    li.className = 'chip';
+    li.dataset.s = s;
+    li.title = q.question || q.title;
+    li.innerHTML =
+      '<svg class="ok" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.2l2.3 2.3 4.7-5"/></svg>' +
+      '<svg class="park" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><rect x="3" y="2.5" width="2" height="7" rx="0.6"/><rect x="7" y="2.5" width="2" height="7" rx="0.6"/></svg>' +
+      '<span></span><em class="sr"></em>';
+    li.querySelector('span').textContent = q.title || q.id;
+    li.querySelector('em').textContent = s === 'done' ? ', settled' : s === 'parked' ? ', parked' : '';
+    return li;
+  }));
+  $('thinking').hidden = !thinking;
+  renderSub();
+}
+
+function caption(source, text) {
+  text = String(text ?? '').trim();
+  if (!text || text.startsWith('[CLAUDE]')) return;
+  const d = document.createElement('div');
+  d.className = source === 'user' ? 'cap you' : 'cap';
+  d.textContent = text;
+  const box = $('captions');
+  box.append(d);
+  while (box.children.length > 3) box.firstElementChild.remove();
+}
+
+// ---------- meter: avatar + waveform ----------
+
+const wave = $('wave');
+const wctx = wave.getContext('2d');
+const BARS = 13;
+const samples = Array.from({ length: BARS }, () => ({ v: 0, out: false }));
+let raf = 0, lastPush = 0, avatarLevel = 0, colors = {};
+
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  colors = { heat: cs.getPropertyValue('--heat').trim(), fg: cs.getPropertyValue('--on-pill').trim(), faint: cs.getPropertyValue('--on-pill-faint').trim() };
+}
+readColors();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+function sizeWave() {
+  const dpr = window.devicePixelRatio || 1;
+  const { width, height } = wave.getBoundingClientRect();
+  wave.width = Math.round(width * dpr);
+  wave.height = Math.round(height * dpr);
+  wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function drawWave() {
+  const w = wave.clientWidth, h = wave.clientHeight;
+  if (!w) return;
+  wctx.clearRect(0, 0, w, h);
+  const gap = 2, bw = (w - gap * (BARS - 1)) / BARS;
+  samples.forEach((s, i) => {
+    const bh = Math.max(3, s.v * h);
+    wctx.fillStyle = s.v < 0.04 ? colors.faint : s.out ? colors.heat : colors.fg;
+    wctx.beginPath();
+    wctx.roundRect(i * (bw + gap), (h - bh) / 2, bw, bh, bw / 2);
+    wctx.fill();
+  });
+}
+
+const shape = (v) => Math.min(1, Math.sqrt(Math.max(0, v)) * 1.25);
+
+function meter(t) {
+  const out = shape(conversation?.getOutputVolume?.() ?? 0);
+  const inp = muted ? 0 : shape(conversation?.getInputVolume?.() ?? 0);
+  avatarLevel += (out - avatarLevel) * (out > avatarLevel ? 0.35 : 0.08);
+  $('avatar').style.setProperty('--level', reduceMotion.matches ? 0 : avatarLevel.toFixed(3));
+  if (t - lastPush > 55) {
+    lastPush = t;
+    samples.shift();
+    samples.push({ v: Math.max(out, inp), out: out >= inp });
+    drawWave();
+  }
+  raf = requestAnimationFrame(meter);
+}
+
+function startMeter() {
+  cancelAnimationFrame(raf);
+  requestAnimationFrame(() => { sizeWave(); raf = requestAnimationFrame(meter); });
+}
+function stopMeter() {
+  cancelAnimationFrame(raf);
+  avatarLevel = 0;
+  $('avatar').style.setProperty('--level', 0);
+  samples.forEach((s) => { s.v = 0; });
+}
+addEventListener('resize', () => { if (pill.dataset.state === 'live') { sizeWave(); drawWave(); } });
+
+// ---------- events from Claude Code ----------
+
+function frame(ev) {
+  if (ev.type === 'thinking') return '[CLAUDE] thinking';
+  if (ev.type === 'end') return '[CLAUDE] end';
+  const r = ev.data;
+  const lines = r.questions.map((q) => `- ${q.id} | ${q.title} | ${q.question} | recommended: ${q.recommendation}`);
+  return `[CLAUDE] round ${r.round} on "${r.topic}". Questions:\n${lines.join('\n')}\nContext: ${r.context ?? ''}`;
+}
+
+function deliver(ev) {
+  if (ev.type === 'round') {
+    if (delivered.has(ev.data.roundId)) return; // SSE replay of a round the agent already has
+    delivered.add(ev.data.roundId);
+    round = ev.data;
+    status = {};
+    thinking = false;
+    renderChips();
+  } else if (ev.type === 'thinking') {
+    if (thinking) return;
+    thinking = true;
+    renderChips();
+  } else if (ev.type === 'end') {
+    if (ending) return;
+    ending = true;
+    endSawSpeaking = false;
+    clearTimeout(endTimer);
+    endTimer = setTimeout(() => conversation?.endSession(), 10_000);
+  }
+  conversation.sendUserMessage(frame(ev));
+}
+
+function onEvent(ev) {
+  if (conversation && live) return deliver(ev);
+  if (ev.type === 'end') {
+    // Nobody is on the call: there is nothing to say goodbye to.
+    queue.length = 0;
+    return;
+  }
+  if (ev.type === 'round' && (delivered.has(ev.data.roundId) || queue.some((q) => q.type === 'round' && q.data.roundId === ev.data.roundId))) return;
+  if (ev.type === 'thinking' && queue.at(-1)?.type === 'thinking') return;
+  queue.push(ev);
+}
+
+function flush() {
+  while (queue.length && conversation && live) deliver(queue.shift());
+}
+
+const events = new EventSource('/api/events');
+for (const type of ['round', 'thinking', 'end']) {
+  events.addEventListener(type, (e) => {
+    let data = {};
+    try { data = JSON.parse(e.data || '{}'); } catch {}
+    onEvent({ type, data });
+  });
+}
+
+// ---------- client tools ----------
+
+async function record(path, body, questionId, mark, ok) {
+  const roundId = round?.roundId;
+  if (roundId == null) return 'No open round.';
+  try {
+    const r = await post(path, { roundId, questionId, ...body });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      return j.error || `Not saved (${r.status}).`;
+    }
+    if (round?.roundId === roundId) {
+      status[questionId] = mark;
+      renderChips();
+    }
+    return ok;
+  } catch (e) {
+    return `Not saved: ${e.message}`;
+  }
+}
+
+const clientTools = {
+  settle_answer: ({ question_id, answer, quote }) =>
+    record('/api/settle', { answer, quote }, question_id, 'done', 'Saved.'),
+  park_question: ({ question_id, reason }) =>
+    record('/api/park', { reason }, question_id, 'parked', 'Parked.'),
+};
+
+// ---------- session ----------
+
+function hangup() {
+  if (!inCall) return;
+  inCall = false;
+  live = false;
+  post('/api/hangup', {}).catch(() => {});
+  post('/api/call', { live: false }).catch(() => {});
+}
+
+function onDisconnect() {
+  const wasInCall = inCall;
+  hangup();
+  clearTimeout(endTimer);
+  conversation = null;
+  ending = false;
+  thinking = false;
+  muted = false;
+  setMuteUi();
+  renderChips();
+  // Chips stay visible as the record of the call until the next start.
+  if (wasInCall) setState('ended');
+}
+
+async function start() {
+  if (starting || conversation) return;
+  starting = true;
+  $('captions').replaceChildren();
+  round = null; status = {}; thinking = false;
+  renderChips();
+  setState('connecting');
+  try {
+    await navigator.mediaDevices.getUserMedia({ audio: true });
+    const t = await fetch('/api/token').then((r) => r.json());
+    if (!t.token) throw new Error(t.error || 'No conversation token.');
+    const c = await Conversation.startSession({
+      conversationToken: t.token,
+      connectionType: 'webrtc',
+      clientTools,
+      onDisconnect,
+      onModeChange: ({ mode }) => {
+        pill.dataset.mode = mode;
+        if (!ending) return;
+        if (mode === 'speaking') endSawSpeaking = true;
+        else if (mode === 'listening' && endSawSpeaking) conversation?.endSession();
+      },
+      onMessage: ({ source, message }) => caption(source, message),
+      onError: (e) => console.error('[hotseat]', e),
+    });
+    // onConnect fires before startSession resolves; from here on only the resolved object is used.
+    conversation = c;
+    inCall = true;
+    setState('live');
+    renderChips();
+    await post('/api/call', { live: true }).catch(() => {});
+    if (!inCall) return; // hung up while the POST was in flight
+    live = true;
+    flush();
+  } catch (e) {
+    setState('idle');
+    setSub(e?.name === 'NotAllowedError' ? 'Allow the microphone to start.' : String(e?.message || e), true);
+  } finally {
+    starting = false;
+  }
+}
+
+function setMuteUi() {
+  const b = $('mute');
+  b.setAttribute('aria-pressed', String(muted));
+  b.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+  b.querySelector('.slash').toggleAttribute('hidden', !muted);
+}
+
+$('start').addEventListener('click', start);
+$('hang').addEventListener('click', () => conversation?.endSession());
+$('mute').addEventListener('click', () => {
+  muted = !muted;
+  conversation?.setMicMuted(muted);
+  setMuteUi();
+});
+
+addEventListener('beforeunload', () => {
+  if (!inCall) return; // no call: the server notices the closed SSE stream on its own
+  inCall = false;
+  beacon('/api/hangup', {});
+  beacon('/api/call', { live: false });
+});
+</script>
+</body>
+</html>

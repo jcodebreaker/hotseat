@@ -1,0 +1,6 @@
+{
+  "name": "hotseat",
+  "version": "0.1.0",
+  "description": "Answer Claude's questions out loud on a voice call.",
+  "license": "MIT"
+}

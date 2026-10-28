@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "hotseat": {
+      "command": "node",
+      "args": ["--env-file-if-exists=${CLAUDE_PLUGIN_ROOT}/.env", "${CLAUDE_PLUGIN_ROOT}/mcp/server.mjs"]
+    }
+  }
+}
