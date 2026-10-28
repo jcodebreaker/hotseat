@@ -25,6 +25,7 @@
   --color-wait: oklch(72% 0.14 75);
   --color-wait-ink: oklch(52% 0.12 65);
   --color-done: oklch(52% 0.11 155);
+  --color-you: oklch(60% 0.1 250);
   --color-on-tally: oklch(99% 0 0);
   --color-focus: oklch(55% 0.15 250);
 
@@ -62,6 +63,7 @@
     --color-tally-soft: oklch(66% 0.19 27 / 0.18);
     --color-wait: oklch(78% 0.13 75);
     --color-wait-ink: oklch(78% 0.13 75);
+    --color-you: oklch(72% 0.1 250);
     --color-done: oklch(72% 0.12 155);
     --color-focus: oklch(72% 0.13 250);
     color-scheme: dark;
@@ -128,13 +130,13 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 .btn-hang { background: var(--color-tally); color: var(--color-on-tally); }
 .btn-hang:hover { background: color-mix(in oklch, var(--color-tally) 88%, black); }
 
-/* ── level meters ───────────────────────────── */
-.meters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-md); margin-top: calc(-1 * var(--space-md)); }
-.meter { display: flex; align-items: center; gap: var(--space-xs); font: 400 var(--text-xs)/1 var(--font-mono); color: var(--color-ink-3); }
-.meter span { flex: none; width: 3.25rem; }
-.meter .track { flex: 1; height: 3px; border-radius: 2px; background: var(--color-rule); overflow: hidden; }
-.meter i { display: block; height: 100%; background: var(--color-ink); transform-origin: left; transform: scaleX(0); }
-.meter.you i { background: var(--color-ink-2); }
+/* ── spectrogram: the last few seconds of voice, low to high frequency ── */
+.trace { display: flex; flex-direction: column; gap: var(--space-2xs); margin-top: calc(-1 * var(--space-md)); }
+.trace canvas { display: block; width: 100%; height: 64px; }
+.legend { display: flex; gap: var(--space-md); font: 400 var(--text-xs)/1 var(--font-mono); color: var(--color-ink-3); }
+.legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: var(--space-xs); vertical-align: -1px; }
+.legend .k-claude::before { background: var(--color-ink); }
+.legend .k-you::before { background: var(--color-you); }
 
 /* ── the question on air ────────────────────── */
 .now { display: flex; flex-direction: column; gap: var(--space-sm); }
@@ -199,7 +201,6 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
   .call { gap: var(--space-lg); padding-top: var(--space-md); }
   .btn .label { display: none; }
   .ctl .btn { width: 36px; padding: 0; justify-content: center; }
-  .meters { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition-duration: 1ms !important; }
@@ -224,9 +225,9 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
     </div>
   </header>
 
-  <div class="meters" id="meters" aria-hidden="true" hidden>
-    <div class="meter"><span>Claude</span><div class="track"><i id="lv-out"></i></div></div>
-    <div class="meter you"><span>You</span><div class="track"><i id="lv-in"></i></div></div>
+  <div class="trace" id="meters" aria-hidden="true" hidden>
+    <canvas id="trace"></canvas>
+    <div class="legend"><span class="k-claude">Claude</span><span class="k-you">You</span></div>
   </div>
 
   <section class="pickup" id="pickup">
@@ -391,26 +392,100 @@ function caption(source, text) {
 // Tick the clocks in the status bar once a second while on a call.
 setInterval(() => { if (call.dataset.state === 'live') render(); }, 1000);
 
-// ---------- level meters ----------
+// ---------- spectrogram ----------
+// Each column is one sample of the call's real frequency data (agent voice and your mic), folded
+// into 16 log-spaced bands from low to high. Columns scroll right to left; silence is blank.
+// Shaded in the speaker's colour, so the back-and-forth of the last few seconds is visible.
 
-let raf = 0, outLevel = 0, inLevel = 0;
-const shape = (v) => Math.min(1, Math.sqrt(Math.max(0, v)) * 1.3);
-function meter() {
-  const out = shape(conversation?.getOutputVolume?.() ?? 0);
-  const inp = muted ? 0 : shape(conversation?.getInputVolume?.() ?? 0);
-  const k = reduceMotion.matches ? 1 : 0.35;
-  outLevel += (out - outLevel) * (out > outLevel ? k : k / 3);
-  inLevel += (inp - inLevel) * (inp > inLevel ? k : k / 3);
-  $('lv-out').style.transform = `scaleX(${outLevel.toFixed(3)})`;
-  $('lv-in').style.transform = `scaleX(${inLevel.toFixed(3)})`;
+const trace = $('trace');
+const tctx = trace.getContext('2d');
+const BANDS = 16, HEIGHT = 64, COL_W = 3, SAMPLE_MS = 50;
+let raf = 0, lastSample = 0, cols = [], colors = {};
+
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  const v = (n) => cs.getPropertyValue(n).trim();
+  colors = { claude: v('--color-ink'), you: v('--color-you') };
+}
+readColors();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readColors(); drawTrace(); });
+
+function sizeTrace() {
+  const dpr = window.devicePixelRatio || 1;
+  const { width } = trace.getBoundingClientRect();
+  trace.width = Math.round(width * dpr);
+  trace.height = Math.round(HEIGHT * dpr);
+  tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const n = Math.ceil(width / COL_W) + 1;
+  cols = cols.slice(-n);
+  while (cols.length < n) cols.unshift(null);
+}
+
+// FFT bins (0-255 each) → BANDS energies (0-1). Voice lives in the low half of the bins,
+// so bands are log-spaced over the first 40% of them.
+function fold(bins) {
+  if (!bins?.length) return null;
+  const top = Math.max(BANDS + 1, Math.floor(bins.length * 0.4));
+  return Array.from({ length: BANDS }, (_, b) => {
+    const lo = Math.floor(Math.pow(top, b / BANDS)), hi = Math.max(lo + 1, Math.floor(Math.pow(top, (b + 1) / BANDS)));
+    let sum = 0;
+    for (let i = lo; i < hi; i++) sum += bins[i] ?? 0;
+    return Math.min(1, Math.max(0, (sum / (hi - lo) / 255 - 0.12) * 1.5));
+  });
+}
+
+// Without frequency data (older SDK), shape a voice-like profile from the volume alone.
+function fromVolume(v, high) {
+  if (v < 0.04) return new Array(BANDS).fill(0);
+  const f1 = high ? 4 : 3, f2 = high ? 9 : 8;
+  const g = (b, c, s) => Math.exp(-((b - c) ** 2) / (2 * s * s));
+  return Array.from({ length: BANDS }, (_, b) => Math.min(1, v * (g(b, 1, 1.2) + 0.8 * g(b, f1, 1.6) + 0.5 * g(b, f2, 2))));
+}
+
+const energy = (bands) => bands.reduce((a, e) => a + e, 0);
+
+function sample() {
+  let out = fold(conversation?.getOutputByteFrequencyData?.());
+  let inp = muted ? null : fold(conversation?.getInputByteFrequencyData?.());
+  out ??= fromVolume(Math.sqrt(conversation?.getOutputVolume?.() ?? 0), false);
+  inp ??= fromVolume(muted ? 0 : Math.sqrt(conversation?.getInputVolume?.() ?? 0), true);
+  const eo = energy(out), ei = energy(inp);
+  cols.push(Math.max(eo, ei) < 0.4 ? null : eo >= ei ? { who: 'claude', bands: out } : { who: 'you', bands: inp });
+  cols.shift();
+}
+
+function drawTrace() {
+  const w = trace.clientWidth;
+  if (!w) return;
+  tctx.clearRect(0, 0, w, HEIGHT);
+  const bh = HEIGHT / BANDS;
+  const x0 = w - cols.length * COL_W;
+  cols.forEach((c, i) => {
+    if (!c) return;
+    tctx.fillStyle = colors[c.who];
+    c.bands.forEach((e, b) => {
+      if (e < 0.05) return;
+      tctx.globalAlpha = e;
+      tctx.fillRect(x0 + i * COL_W, HEIGHT - (b + 1) * bh, COL_W - 0.5, bh - 0.5);
+    });
+  });
+  tctx.globalAlpha = 1;
+}
+
+function meter(t) {
+  if (t - lastSample >= SAMPLE_MS) {
+    lastSample = t;
+    sample();
+    drawTrace();
+  }
   raf = requestAnimationFrame(meter);
 }
-function startMeter() { cancelAnimationFrame(raf); raf = requestAnimationFrame(meter); }
-function stopMeter() {
+function startMeter() {
   cancelAnimationFrame(raf);
-  outLevel = inLevel = 0;
-  $('lv-out').style.transform = $('lv-in').style.transform = 'scaleX(0)';
+  requestAnimationFrame(() => { sizeTrace(); drawTrace(); raf = requestAnimationFrame(meter); });
 }
+function stopMeter() { cancelAnimationFrame(raf); }
+addEventListener('resize', () => { if (call.dataset.state === 'live') { sizeTrace(); drawTrace(); } });
 
 // ---------- events from Claude Code ----------
 
