@@ -52,6 +52,11 @@ const tools = {
       reason: { type: 'string', description: "Why it is parked, in the person's words." },
     },
   ),
+  confirm_round: clientTool(
+    'confirm_round',
+    'Send the round to Claude once the person confirms the recap ("yes", "send it", "confirm", "looks good").',
+    {},
+  ),
 };
 
 async function agentConfig(toolIds) {

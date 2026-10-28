@@ -13,6 +13,7 @@ const transport = new StdioClientTransport({
     ELEVENLABS_API_KEY: 'fake-key',
     HOTSEAT_SSE_GRACE_MS: '500',
     HOTSEAT_PROGRESS_MS: '100',
+    HOTSEAT_REVIEW_MS: '5000',
   },
   stderr: 'pipe',
 });
@@ -100,14 +101,31 @@ await step('settles a two-question round', async () => {
   assert.equal((await post(base, '/api/settle', { roundId: 1, questionId: 'q1', answer: 'The person.', quote: 'me' })).status, 200);
   await new Promise((r) => setTimeout(r, 250));
   assert.equal((await post(base, '/api/settle', { roundId: 1, questionId: 'q1', answer: 'The team.', quote: 'the team… actually… call it team.' })).status, 200);
+  assert.equal((await post(base, '/api/confirm', { roundId: 1 })).status, 409, 'nothing to confirm before the last answer');
   assert.equal((await post(base, '/api/settle', { roundId: 1, questionId: 'q2', answer: 'One.', quote: 'just one' })).status, 200);
+
+  // Every question has an answer: the round waits for the person to check it.
+  const check = await events.next();
+  assert.equal(check.event, 'review');
+  assert.equal(check.data.roundId, 1);
+  let resolved = false;
+  pending.then(() => (resolved = true));
+  await new Promise((r) => setTimeout(r, 250));
+  assert.equal(resolved, false, 'not sent before confirm');
+  // A late "go back" still lands, and restarts the check.
+  assert.equal((await post(base, '/api/settle', { roundId: 1, questionId: 'q2', answer: 'Two.', quote: 'make it two' })).status, 200);
+  assert.equal((await events.next()).event, 'review');
+  assert.equal((await post(base, '/api/hold', { roundId: 1 })).status, 200);
+  assert.equal((await events.next()).event, 'review');
+  assert.equal((await post(base, '/api/confirm', { roundId: 1 })).status, 200);
 
   const out = result(await Promise.race([pending, timeout(5000)]));
   assert.equal(out.status, 'settled');
   assert.deepEqual(out.answers, [
     { id: 'q1', status: 'settled', answer: 'The team.', quote: 'the team… actually… call it team.' },
-    { id: 'q2', status: 'settled', answer: 'One.', quote: 'just one' },
+    { id: 'q2', status: 'settled', answer: 'Two.', quote: 'make it two' },
   ]);
+  assert.equal((await post(base, '/api/confirm', { roundId: 1 })).status, 409, 'confirm twice');
   assert.equal(typeof out.durationSec, 'number');
   assert.equal((await events.next()).event, 'thinking');
   assert.ok(progress.some((p) => p.message?.startsWith('1/2 settled · Owner: The person.')), 'progress message');

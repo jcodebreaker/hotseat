@@ -197,6 +197,31 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 .err { margin: 0; font-size: var(--text-sm); color: var(--color-tally); }
 .err:empty { display: none; }
 
+/* Review: every answer, nothing else, before it goes to Claude */
+.review { display: flex; flex-direction: column; gap: var(--space-md); }
+.review-top { display: flex; align-items: center; gap: var(--space-xs); font: 500 var(--text-xs)/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-ink-3); }
+.review-top .left { margin-left: auto; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+.review h1 { margin: 0; font: 550 var(--text-q)/1.15 var(--font-display); letter-spacing: -0.01em; text-wrap: balance; }
+.review ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-xs); }
+.answer { width: 100%; display: grid; grid-template-columns: 1.75rem minmax(0, 1fr); gap: var(--space-sm); text-align: left; padding: var(--space-md); border: 1px solid var(--color-rule); border-radius: var(--radius-sm); transition: border-color var(--dur-fast) var(--ease-out); }
+.answer:hover { border-color: var(--color-ink-3); }
+.answer[data-changed] { border-color: var(--color-you); }
+.answer .n { font: 500 var(--text-sm)/1.6 var(--font-mono); color: var(--color-ink-3); }
+.answer .body { display: flex; flex-direction: column; gap: var(--space-2xs); min-width: 0; }
+.answer .qtext { font-size: var(--text-sm); color: var(--color-ink-2); }
+.answer .a { font: 550 1.375rem/1.2 var(--font-display); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
+.answer .tag { font: 500 0.6875rem/1 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 6px; border-radius: 4px; border: 1px solid currentColor; }
+.answer .tag.changed { color: var(--color-you); }
+.answer .tag.parked { color: var(--color-wait-ink); }
+.answer q { font: 450 var(--text-md)/1.4 var(--font-display); color: var(--color-ink-3); }
+.review-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
+.btn-confirm { display: inline-flex; align-items: center; gap: var(--space-xs); padding: 0.7rem 1.15rem; border-radius: var(--radius-sm); background: var(--color-ink); color: var(--color-paper); font-weight: 600; }
+.btn-confirm svg { width: 18px; height: 18px; }
+.btn-confirm circle { fill: none; stroke-width: 2.5; }
+.btn-confirm .ring-bg { stroke: currentColor; opacity: 0.3; }
+.btn-confirm .ring-fg { stroke: currentColor; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; }
+.review-foot .hint { margin: 0; font: 400 var(--text-sm)/1.4 var(--font-body); color: var(--color-ink-2); }
+
 @media (max-width: 430px) {
   .call { gap: var(--space-lg); padding-top: var(--space-md); }
   .btn .label { display: none; }
@@ -243,6 +268,19 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
     <p class="rec" id="rec"></p>
   </section>
 
+  <section class="review" id="review" aria-label="Check your answers" hidden>
+    <div class="review-top"><span>Ready to send</span><span class="left" id="review-left"></span></div>
+    <h1>Did we get this right?</h1>
+    <ol id="review-list"></ol>
+    <div class="review-foot">
+      <button class="btn-confirm" id="confirm" type="button">
+        <svg viewBox="0 0 18 18" aria-hidden="true"><circle class="ring-bg" cx="9" cy="9" r="7"/><circle class="ring-fg" id="ring" cx="9" cy="9" r="7" stroke-dasharray="44" stroke-dashoffset="0"/></svg>
+        Confirm
+      </button>
+      <span class="hint">Or say "send it". Tap an answer to change it.</span>
+    </div>
+  </section>
+
   <div class="lines" id="lines" aria-live="polite"></div>
 
   <ol class="ledger" id="ledger" aria-label="Questions this round"></ol>
@@ -270,6 +308,9 @@ let round = null;         // { roundId, topic, round, questions[], context }
 let status = {};          // questionId -> 'done' | 'parked'
 let answers = {};         // questionId -> { answer, quote } | { reason }
 let thinking = false, thinkingSince = 0;
+let reviewing = false, reviewEndsAt = 0, reviewMs = 1; // every question answered, waiting for Confirm
+let changed = new Set();  // questionIds re-answered during the review
+let reviewKey = '';       // what the review list last showed
 let ending = false, endSawSpeaking = false, endTimer = 0;
 const delivered = new Set(); // roundIds already sent to the agent
 
@@ -296,7 +337,7 @@ function setState(state) {
   call.dataset.state = state;
   const isLive = state === 'live';
   $('pickup').hidden = isLive;
-  $('mute').hidden = $('hang').hidden = $('meters').hidden = !isLive;
+  $('mute').hidden = $('hang').hidden = !isLive;
   $('start').disabled = state === 'connecting';
   $('start-label').textContent = state === 'connecting' ? 'Connecting…' : state === 'ended' ? 'Call back' : 'Pick up';
   if (isLive) startMeter(); else stopMeter();
@@ -333,6 +374,13 @@ function render() {
       lead.append("Waiting for Claude's questions.");
     }
   }
+
+  // the check before sending: only the answers, nothing else on screen
+  const checking = state === 'live' && reviewing && !thinking && !!r;
+  $('review').hidden = !checking;
+  $('meters').hidden = state !== 'live' || checking;
+  $('lines').hidden = $('ledger').hidden = checking;
+  if (checking) return renderReview(r);
 
   // the question on air
   const now = $('now');
@@ -375,6 +423,37 @@ function renderLedger(r, state) {
     } else if (s === 'parked' && a?.reason) {
       li.append(el('div', 'a', a.reason));
     }
+    return li;
+  }));
+}
+
+function renderReview(r) {
+  $('now').hidden = true;
+  const left = Math.max(0, reviewEndsAt - Date.now());
+  $('review-left').textContent = `sends in ${Math.ceil(left / 1000)}s`;
+  $('ring').setAttribute('stroke-dashoffset', String(44 * (1 - left / reviewMs)));
+  // The clock ticks every second; only rebuild the answers when they change, so taps and focus survive.
+  const key = JSON.stringify([r.roundId, status, answers, [...changed]]);
+  if (key === reviewKey) return;
+  reviewKey = key;
+  $('review-list').replaceChildren(...r.questions.map((q, i) => {
+    const a = answers[q.id] ?? {};
+    const parked = status[q.id] === 'parked';
+    const b = el('button', 'answer');
+    b.type = 'button';
+    b.setAttribute('aria-label', `Change answer ${i + 1}`);
+    if (changed.has(q.id)) b.dataset.changed = '';
+    const ans = el('span', 'a', parked ? 'Later' : a.answer || '');
+    if (changed.has(q.id)) ans.append(el('span', 'tag changed', 'Changed'));
+    else if (parked) ans.append(el('span', 'tag parked', 'Parked'));
+    const body = el('span', 'body');
+    body.append(el('span', 'qtext', q.question), ans);
+    const said = parked ? a.reason : a.quote;
+    if (said) body.append(el('q', null, said));
+    b.append(el('span', 'n', String(i + 1)), body);
+    b.addEventListener('click', () => changeAnswer(q.id));
+    const li = el('li');
+    li.append(b);
     return li;
   }));
 }
@@ -505,9 +584,12 @@ function deliver(ev) {
     status = {};
     answers = {};
     thinking = false;
+    reviewing = false;
+    changed = new Set();
   } else if (ev.type === 'thinking') {
     if (thinking) return;
     thinking = true;
+    reviewing = false;
     thinkingSince = Date.now();
   } else if (ev.type === 'end') {
     if (ending) return;
@@ -545,6 +627,16 @@ for (const type of ['round', 'thinking', 'end']) {
     onEvent({ type, data });
   });
 }
+// The review is screen-only: the agent already knows every answer is in and does its own recap.
+events.addEventListener('review', (e) => {
+  let data = {};
+  try { data = JSON.parse(e.data || '{}'); } catch {}
+  if (round?.roundId !== data.roundId) return;
+  reviewing = true;
+  reviewMs = Math.max(1, data.sendsInMs);
+  reviewEndsAt = Date.now() + data.sendsInMs;
+  render();
+});
 
 // ---------- client tools ----------
 
@@ -558,6 +650,7 @@ async function record(path, body, questionId, mark, ok) {
       return j.error || `Not saved (${r.status}).`;
     }
     if (round?.roundId === roundId) {
+      if (reviewing) changed.add(questionId);
       status[questionId] = mark;
       answers[questionId] = body;
       render();
@@ -573,7 +666,30 @@ const clientTools = {
     record('/api/settle', { answer, quote }, question_id, 'done', 'Saved.'),
   park_question: ({ question_id, reason }) =>
     record('/api/park', { reason }, question_id, 'parked', 'Parked.'),
+  confirm_round: () => confirmRound(),
 };
+
+async function confirmRound() {
+  const roundId = round?.roundId;
+  if (roundId == null) return 'No open round.';
+  try {
+    const r = await post('/api/confirm', { roundId });
+    if (r.ok) return 'Sent to Claude.';
+    const j = await r.json().catch(() => ({}));
+    return j.error || `Not sent (${r.status}).`;
+  } catch (e) {
+    return `Not sent: ${e.message}`;
+  }
+}
+
+// Tapping an answer: hold the automatic send and have the agent ask that question again.
+function changeAnswer(questionId) {
+  if (!reviewing || round == null) return;
+  post('/api/hold', { roundId: round.roundId }).catch(() => {});
+  conversation?.sendUserMessage(`[CLAUDE] change ${questionId}`);
+}
+
+$('confirm').addEventListener('click', () => { confirmRound(); });
 
 // ---------- session ----------
 
@@ -596,6 +712,7 @@ function onDisconnect() {
   conversation = null;
   ending = false;
   thinking = false;
+  reviewing = false;
   muted = false;
   setMuteUi();
   if (wasInCall) setState('ended'); else render();
@@ -606,7 +723,7 @@ async function start() {
   starting = true;
   setError('');
   $('lines').replaceChildren();
-  round = null; status = {}; answers = {}; thinking = false;
+  round = null; status = {}; answers = {}; thinking = false; reviewing = false; changed = new Set(); reviewKey = '';
   setState('connecting');
   try {
     await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -623,7 +740,11 @@ async function start() {
         if (mode === 'speaking') endSawSpeaking = true;
         else if (mode === 'listening' && endSawSpeaking) conversation?.endSession();
       },
-      onMessage: ({ source, message }) => caption(source, message),
+      onMessage: ({ source, message }) => {
+        caption(source, message);
+        // Talking during the check pushes the automatic send back.
+        if (source === 'user' && reviewing && round) post('/api/hold', { roundId: round.roundId }).catch(() => {});
+      },
       onError: (e) => console.error('[hotseat]', e),
     });
     // onConnect fires before startSession resolves; from here on only the resolved object is used.

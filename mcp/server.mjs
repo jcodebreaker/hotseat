@@ -14,6 +14,7 @@ const ms = (name, fallback) => Number(process.env[name]) || fallback;
 const SSE_GRACE_MS = ms('HOTSEAT_SSE_GRACE_MS', 10_000);
 const CONNECT_MS = ms('HOTSEAT_CONNECT_MS', 90_000);
 const PROGRESS_MS = ms('HOTSEAT_PROGRESS_MS', 15_000);
+const REVIEW_MS = ms('HOTSEAT_REVIEW_MS', 20_000);
 const log = (...args) => console.error('hotseat:', ...args);
 
 // Session state.
@@ -57,8 +58,10 @@ function onSseConnect(req, res) {
   clients.add(res);
   clearTimeout(graceTimer);
   clearTimeout(connectTimer);
-  if (round) res.write(`event: round\ndata: ${JSON.stringify(roundEvent(round))}\n\n`);
-  else if (finished && !ended) res.write('event: thinking\ndata: {}\n\n');
+  if (round) {
+    res.write(`event: round\ndata: ${JSON.stringify(roundEvent(round))}\n\n`);
+    if (round.reviewing) res.write(`event: review\ndata: ${JSON.stringify(reviewEvent(round))}\n\n`);
+  } else if (finished && !ended) res.write('event: thinking\ndata: {}\n\n');
   req.on('close', () => {
     clients.delete(res);
     if (clients.size) return;
@@ -81,6 +84,7 @@ function finish(status, note) {
   finished = true;
   clearTimeout(graceTimer);
   clearTimeout(connectTimer);
+  clearTimeout(r.reviewTimer);
   clearInterval(r.progressTimer);
   if (status !== 'hung_up') push('thinking');
   const answers = r.questions.map(({ id }) => ({ id, status: 'unanswered', ...r.answers.get(id) }));
@@ -99,8 +103,38 @@ function record(input, answer) {
   round.answers.set(input.questionId, answer);
   round.last = input.questionId;
   if (round.answers.size === round.questions.length) {
-    finish([...round.answers.values()].every((a) => a.status === 'settled') ? 'settled' : 'partial');
+    // A one-question round goes straight to Claude. Longer rounds wait for the person to check the
+    // answers ("send it" or the Confirm button), so a late "go back" still lands.
+    if (round.questions.length === 1) complete();
+    else review();
   }
+  return [200, { ok: true }];
+}
+
+const complete = () => finish([...round.answers.values()].every((a) => a.status === 'settled') ? 'settled' : 'partial');
+const reviewEvent = (r) => ({ roundId: r.id, sendsInMs: Math.max(0, r.reviewEndsAt - Date.now()) });
+
+// Open or restart the check: every answer, any new word from the person, or a tapped answer pushes the
+// automatic send back, so it only fires after REVIEW_MS of quiet.
+function review() {
+  const r = round;
+  r.reviewing = true;
+  r.reviewEndsAt = Date.now() + REVIEW_MS;
+  clearTimeout(r.reviewTimer);
+  r.reviewTimer = setTimeout(() => round === r && complete(), REVIEW_MS);
+  push('review', reviewEvent(r));
+}
+
+function confirm(input) {
+  if (!round || input.roundId !== round.id) return [409, { error: 'That round is closed. It was already sent to Claude.' }];
+  if (!round.reviewing) return [409, { error: 'Not every question has an answer yet.' }];
+  complete();
+  return [200, { ok: true }];
+}
+
+function hold(input) {
+  if (!round || input.roundId !== round.id || !round.reviewing) return [409, { error: 'Nothing to hold.' }];
+  review();
   return [200, { ok: true }];
 }
 
@@ -255,6 +289,8 @@ const routes = {
     const input = await body(req);
     json(res, ...record(input, { status: 'parked', reason: String(input.reason ?? '') }));
   },
+  'POST /api/confirm': async (req, res) => json(res, ...confirm(await body(req))),
+  'POST /api/hold': async (req, res) => json(res, ...hold(await body(req))),
   'POST /api/hangup': async (req, res) => {
     await body(req).catch(() => ({}));
     finish('hung_up');
@@ -291,7 +327,7 @@ const tools = [
   {
     name: 'ask_by_voice',
     description:
-      'Ask the user a round of questions on a voice call. Opens the call window on first use and reuses it after. Resolves when every question is settled or parked, or the call ends.',
+      'Ask the user a round of questions on a voice call. Opens the call window on first use and reuses it after. Resolves once every question is settled or parked and the person confirms the answers (or stays quiet for 20 seconds), or when the call ends.',
     inputSchema: {
       type: 'object',
       properties: {

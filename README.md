@@ -18,8 +18,9 @@
 1. **Claude asks a round of questions.** Grilling a plan, confirming a spec, anything with a recommendation per question. Hotseat adds one line at the end: `v · answer out loud`.
 2. **Reply `v`.** A call window opens next to your terminal. Press **Pick up**.
 3. **Talk it through.** A voice agent asks each question with Claude's recommendation, so "yes" accepts it. Say "you decide", "park it" or "go back" whenever you need to. Interrupt it like you would a person.
-4. **Your answers land in Claude Code** with the words you actually said, so nothing gets paraphrased away. Claude keeps going: glossary, ADRs, the next question.
-5. **The next round goes straight into the same call.** No second `v`. Claude hangs up when nothing is left to ask.
+4. **Check, then send.** After the last question the window shows just your answers. Say "send it" or tap **Confirm**, or tap an answer to change it. Quiet for 20 seconds sends it as is.
+5. **Your answers land in Claude Code** with the words you actually said, so nothing gets paraphrased away. Claude keeps going: glossary, ADRs, the next question.
+6. **The next round goes straight into the same call.** No second `v`. Claude hangs up when nothing is left to ask.
 
 Claude stays the brain: it picks the questions, reads the repo and writes the files. The voice agent is only ears and mouth.
 

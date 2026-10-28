@@ -21,7 +21,8 @@ for (let i = 0; i < 6 && pid > 1; i++) {
       decision: 'block',
       reason:
         'The user is still on the hotseat voice call, waiting in silence for the next round. ' +
-        'Send your next questions through ask_by_voice now, or call end_call if nothing is left to ask.',
+        'Send your next questions through ask_by_voice now, or call end_call if nothing is left to ask. ' +
+        'If an ask_by_voice result is still on its way from a background task, wait for it instead.',
     }));
     break;
   }
