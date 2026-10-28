@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>hotseat banner</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&family=Newsreader:opsz,wght@6..72,550&display=block">
+<style>
+:root { --paper: oklch(98.5% 0.003 250); --ink: oklch(22% 0.012 250); --ink-2: oklch(45% 0.012 250); --ink-3: oklch(62% 0.01 250); --rule: oklch(89% 0.006 250); --tally: oklch(58% 0.19 27); --you: oklch(60% 0.1 250); }
+html, body { margin: 0; width: 1280px; height: 640px; background: var(--paper); color: var(--ink); font-family: "IBM Plex Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
+.wrap { position: absolute; inset: 0; padding: 72px 96px; display: flex; flex-direction: column; gap: 22px; }
+.bar { display: flex; align-items: center; gap: 12px; font: 500 20px/1 "IBM Plex Mono", monospace; padding-bottom: 18px; border-bottom: 1px solid var(--rule); }
+.bar i { width: 14px; height: 14px; border-radius: 50%; background: var(--tally); box-shadow: 0 0 0 6px oklch(58% 0.19 27 / 0.14); }
+.bar span { color: var(--ink-2); font-weight: 400; }
+h1 { margin: 18px 0 0; font: 550 82px/1.02 "Newsreader", Georgia, serif; letter-spacing: -0.022em; }
+p { margin: 0; font-size: 26px; color: var(--ink-2); }
+canvas { position: absolute; left: 96px; right: 96px; bottom: 64px; width: calc(100% - 192px); height: 96px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar"><i></i>hotseat <span>On air · 2:14</span></div>
+  <h1>Claude asks.<br>You answer out loud.</h1>
+  <p>A voice layer for Claude Code.</p>
+</div>
+<canvas id="c"></canvas>
+<script>
+const cv = document.getElementById('c'), dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = 96;
+cv.width = w * dpr; cv.height = h * dpr;
+const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+const cs = getComputedStyle(document.documentElement), ink = cs.getPropertyValue('--ink'), you = cs.getPropertyValue('--you');
+const B = 16, COL = 4, bh = h / B, hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const turns = [[0, 0.3, 'c'], [0.34, 0.5, 'y'], [0.54, 0.74, 'c'], [0.78, 0.9, 'y'], [0.93, 1, 'c']];
+const n = Math.floor(w / COL);
+for (let i = 0; i < n; i++) {
+  const x = i / n, tr = turns.find(([a, b]) => x >= a && x < b);
+  if (!tr) continue;
+  const t = i * 0.05, p = tr[2] === 'c' ? 0.15 : 0.12;
+  const env = Math.max(0, Math.sin(t / p) * Math.sin(t / (p * 3.3)) + 0.3);
+  if (env < 0.2) continue;
+  const f1 = tr[2] === 'y' ? 4 : 3, f2 = tr[2] === 'y' ? 9 : 8, wob = Math.sin(t * 9) * 1.2;
+  const g = (b, c, s) => Math.exp(-((b - c) ** 2) / (2 * s * s));
+  ctx.fillStyle = tr[2] === 'c' ? ink : you;
+  for (let b = 0; b < B; b++) {
+    const e = Math.min(1, env * (0.9 * g(b, 1, 1.2) + 0.8 * g(b, f1 + wob * 0.5, 1.6) + 0.55 * g(b, f2 + wob, 2) + 0.12 * hash(i * 31 + b)));
+    if (e < 0.05) continue;
+    ctx.globalAlpha = e;
+    ctx.fillRect(i * COL, h - (b + 1) * bh, COL - 0.75, bh - 0.75);
+  }
+}
+window.render = () => {};
+</script>
+</body>
+</html>

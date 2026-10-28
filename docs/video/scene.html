@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>hotseat explainer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,450;6..72,550&display=block">
+<style>
+:root {
+  --paper: oklch(98.5% 0.003 250);
+  --paper-2: oklch(95.5% 0.005 250);
+  --ink: oklch(22% 0.012 250);
+  --ink-2: oklch(45% 0.012 250);
+  --ink-3: oklch(62% 0.01 250);
+  --rule: oklch(89% 0.006 250);
+  --tally: oklch(58% 0.19 27);
+  --wait: oklch(72% 0.14 75);
+  --wait-ink: oklch(52% 0.12 65);
+  --done: oklch(52% 0.11 155);
+  --you: oklch(60% 0.1 250);
+  --desk: oklch(93% 0.006 250);
+  --term: oklch(17% 0.008 250);
+  --term-fg: oklch(92% 0.004 250);
+  --term-dim: oklch(62% 0.01 250);
+  --term-faint: oklch(42% 0.01 250);
+  --term-ok: oklch(74% 0.14 150);
+  --term-clay: oklch(68% 0.13 45);
+  --display: "Newsreader", Georgia, serif;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 1280px; height: 720px; overflow: hidden; background: var(--desk); color: var(--ink); font-family: var(--body); -webkit-font-smoothing: antialiased; }
+
+/* title + outro */
+.card { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 0 120px; gap: 22px; background: var(--paper); opacity: 0; }
+.card .brand { font: 500 20px/1 var(--mono); display: flex; align-items: center; gap: 12px; }
+.card .brand i { width: 14px; height: 14px; border-radius: 50%; background: var(--tally); box-shadow: 0 0 0 6px oklch(58% 0.19 27 / 0.14); }
+.card h1 { margin: 0; font: 550 76px/1.04 var(--display); letter-spacing: -0.02em; max-width: 15ch; }
+.card p { margin: 0; font-size: 24px; color: var(--ink-2); max-width: 40ch; }
+.card pre { margin: 0; font: 400 22px/1.7 var(--mono); color: var(--ink); background: var(--paper-2); padding: 18px 24px; border-radius: 8px; align-self: flex-start; }
+.card pre span { color: var(--ink-3); }
+.card .url { font: 500 20px/1 var(--mono); color: var(--ink-2); }
+
+/* split stage */
+.stage { position: absolute; inset: 0; padding: 36px 40px 92px; display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 28px; opacity: 0; }
+.pane-label { font: 500 13px/1 var(--mono); color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px; }
+.term { background: var(--term); color: var(--term-fg); border-radius: 12px; padding: 22px 24px; font: 400 14.5px/1.62 var(--mono); height: 560px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; box-shadow: 0 24px 50px -30px oklch(20% 0.02 250 / 0.6); }
+.term .ln { white-space: pre-wrap; min-height: 1.62em; }
+.term .dim { color: var(--term-dim); } .term .faint { color: var(--term-faint); } .term .ok { color: var(--term-ok); } .term .clay { color: var(--term-clay); } .term .b { font-weight: 600; } .term .heat { color: oklch(72% 0.17 40); }
+.term .offer { border: 1px solid var(--term-faint); border-radius: 6px; padding: 4px 10px; margin: 6px 0; }
+.term .offer b { background: oklch(72% 0.17 40); color: oklch(17% 0.008 250); padding: 0 6px; border-radius: 3px; }
+.term .prompt { margin-top: 10px; border: 1px solid var(--term-faint); border-radius: 6px; padding: 6px 10px; }
+.term .caret { display: inline-block; width: 0.55em; height: 1.1em; vertical-align: -0.2em; background: var(--term-fg); }
+
+.callwin { background: var(--paper); border-radius: 12px; height: 560px; padding: 22px 26px; display: flex; flex-direction: column; gap: 20px; overflow: hidden; box-shadow: 0 24px 50px -30px oklch(20% 0.02 250 / 0.45), 0 0 0 1px var(--rule); }
+.bar { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--rule); font: 400 13px/1 var(--mono); }
+.tally { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-3); }
+.tally.on { background: var(--tally); box-shadow: 0 0 0 4px oklch(58% 0.19 27 / 0.14); }
+.tally.wait { background: var(--wait); }
+.bar .brand { font-weight: 500; }
+.bar .status { flex: 1; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.bar .btn { font: 500 12.5px/1 var(--body); padding: 8px 10px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--rule); }
+.bar .btn.hang { background: var(--tally); color: white; box-shadow: none; }
+canvas#spec { width: 100%; height: 56px; display: block; margin-top: -8px; }
+.legend { display: flex; gap: 14px; font: 400 11.5px/1 var(--mono); color: var(--ink-3); margin-top: -14px; }
+.legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; vertical-align: -1px; background: var(--ink); }
+.legend .y::before { background: var(--you); }
+.ord { font: 500 11.5px/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.q { margin: 8px 0 0; font: 550 30px/1.15 var(--display); letter-spacing: -0.012em; }
+.rec { margin: 8px 0 0; font-size: 14.5px; color: var(--ink-2); }
+.rec b { color: var(--ink); font-weight: 600; }
+.lines { border-left: 2px solid var(--rule); padding-left: 12px; display: flex; flex-direction: column; gap: 4px; min-height: 48px; }
+.say { font-size: 14px; color: var(--ink-2); } .say:last-child { color: var(--ink); }
+.say b { font: 500 11px/1 var(--mono); color: var(--ink-3); margin-right: 8px; letter-spacing: 0.04em; }
+.ledger { border-top: 1px solid var(--rule); }
+.row { display: grid; grid-template-columns: 34px 1fr auto; padding: 9px 0; border-bottom: 1px solid var(--rule); font-size: 14px; column-gap: 10px; }
+.row .n { font: 400 13px/1.5 var(--mono); color: var(--ink-3); }
+.row .s { font: 500 11px/1.6 var(--mono); letter-spacing: 0.04em; color: var(--ink-3); }
+.row .a { grid-column: 2 / 4; font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
+.row .a q { font-family: var(--display); font-size: 14px; }
+.row.pending .t { color: var(--ink-3); }
+.row.current .n, .row.current .s { color: var(--tally); } .row.current .t { font-weight: 500; }
+.row.done .s { color: var(--done); } .row.parked .s { color: var(--wait-ink); }
+.lead { font: 550 30px/1.2 var(--display); letter-spacing: -0.012em; margin: 0; }
+.lead span { color: var(--ink-2); }
+.pick { align-self: flex-start; background: var(--ink); color: var(--paper); font: 500 15px/1 var(--body); padding: 13px 20px; border-radius: 6px; display: inline-flex; gap: 10px; align-items: center; }
+.pick i { width: 8px; height: 8px; border-radius: 50%; background: var(--tally); }
+
+.caption { position: absolute; left: 40px; right: 40px; bottom: 26px; height: 46px; display: flex; align-items: center; gap: 16px; }
+.caption .num { font: 600 15px/1 var(--mono); width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--paper); }
+.caption .txt { font: 500 22px/1.2 var(--body); letter-spacing: -0.01em; }
+.caption .txt span { color: var(--ink-3); font-weight: 400; }
+.dots { margin-left: auto; display: flex; gap: 6px; }
+.dots i { width: 22px; height: 3px; border-radius: 2px; background: var(--rule); }
+.dots i.on { background: var(--ink); }
+</style>
+</head>
+<body>
+<section class="card" id="title">
+  <div class="brand"><i></i>hotseat</div>
+  <h1>Claude asks. You answer out loud.</h1>
+  <p>A voice layer for Claude Code: talk through its questions, and your exact words land back in the session.</p>
+</section>
+
+<section class="stage" id="stage">
+  <div>
+    <div class="pane-label">Claude Code</div>
+    <div class="term" id="term"></div>
+  </div>
+  <div>
+    <div class="pane-label">The call</div>
+    <div class="callwin" id="callwin"></div>
+  </div>
+  <div class="caption"><div class="num" id="cap-n">1</div><div class="txt" id="cap-t"></div><div class="dots" id="dots"><i></i><i></i><i></i><i></i><i></i></div></div>
+</section>
+
+<section class="card" id="outro">
+  <div class="brand"><i></i>hotseat</div>
+  <h1 style="font-size:58px;max-width:none">Install it in Claude Code.</h1>
+  <pre><span>&gt;</span> /plugin marketplace add jcodebreaker/hotseat
+<span>&gt;</span> /plugin install hotseat@hotseat</pre>
+  <div class="url">github.com/jcodebreaker/hotseat · MIT</div>
+</section>
+
+<script>
+// Deterministic timeline: render(t) rebuilds the whole frame for time t (seconds).
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const after = (t, at) => t >= at;
+const typed = (t, at, text, cps = 22) => text.slice(0, Math.max(0, Math.floor((t - at) * cps)));
+const fade = (t, a, b) => Math.max(0, Math.min(1, (t - a) / (b - a)));
+
+const Q = [
+  { title: 'Who owns a shared bot', q: 'Who owns a shared bot?', rec: 'The team, not the person who made it.' },
+  { title: 'Can guests trigger it', q: 'Can a guest in a team chat trigger the bot?', rec: 'No, members only.' },
+  { title: 'Chats after someone leaves', q: 'When someone leaves, do their private chats with the bot stay?', rec: 'Yes, private to them.' },
+];
+const ANS = [
+  { at: 13.6, a: 'The team owns shared bots.', quote: 'The people. Call it team.' },
+  { at: 16.7, a: 'Only members can trigger it.', quote: 'Right, members only.' },
+  { at: 19.1, parked: 'Needs a check with legal.' },
+];
+// Who is talking when: [from, to, who]
+const TALK = [
+  [9.6, 11.4, 'claude'], [11.8, 12.4, 'you'], [12.6, 13.0, 'claude'], [13.1, 13.5, 'you'],
+  [14.0, 15.4, 'claude'], [15.8, 16.6, 'you'],
+  [17.0, 18.0, 'claude'], [18.2, 19.0, 'you'],
+  [19.4, 20.2, 'claude'],
+  [24.0, 26.4, 'claude'],
+];
+const SAYS = [
+  [9.6, 'claude', "Who owns a shared bot? I'd say the team, not whoever made it. Sound right?"],
+  [11.8, 'you', 'Yeah, the workspace.'],
+  [12.6, 'claude', 'Your glossary says workspace is a billing account. The group of people?'],
+  [13.1, 'you', 'The people. Call it team.'],
+  [14.0, 'claude', 'Can a guest in a team chat trigger the bot? Claude says members only.'],
+  [15.8, 'you', 'Right, members only.'],
+  [17.0, 'claude', 'Someone leaves. Do their private chats with the bot stay?'],
+  [18.2, 'you', 'Park that one, I need to check with legal.'],
+  [19.4, 'claude', "Got it. I'll pass these to Claude."],
+  [24.0, 'claude', 'One more: should the bot remember across the team, or per chat?'],
+];
+const speaker = (t) => TALK.find(([a, b]) => t >= a && t < b)?.[2] ?? null;
+
+// ── spectrogram, computed from time so any frame is reproducible ──
+const BANDS = 16, COL = 3, DT = 0.05;
+const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+function bands(ts) {
+  const w = speaker(ts);
+  if (!w) return null;
+  const p = w === 'claude' ? 0.15 : 0.12;
+  const env = Math.max(0, Math.sin(ts / p) * Math.sin(ts / (p * 3.3)) + 0.3);
+  if (env < 0.18) return null;
+  const f1 = w === 'you' ? 4 : 3, f2 = w === 'you' ? 9 : 8, wob = Math.sin(ts * 9) * 1.2;
+  const g = (b, c, s) => Math.exp(-((b - c) ** 2) / (2 * s * s));
+  const k = Math.round(ts / DT);
+  return { w, e: Array.from({ length: BANDS }, (_, b) => Math.min(1, env * (0.9 * g(b, 1, 1.2) + 0.8 * g(b, f1 + wob * 0.5, 1.6) + 0.55 * g(b, f2 + wob, 2) + 0.12 * hash(k * 31 + b)))) };
+}
+function drawSpec(t) {
+  const cv = $('spec');
+  if (!cv) return;
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = 56;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const n = Math.ceil(w / COL), bh = h / BANDS, cs = getComputedStyle(document.documentElement);
+  const col = { claude: cs.getPropertyValue('--ink'), you: cs.getPropertyValue('--you') };
+  const now = Math.floor(t / DT) * DT;
+  for (let i = 0; i < n; i++) {
+    const c = bands(now - (n - 1 - i) * DT);
+    if (!c) continue;
+    ctx.fillStyle = col[c.w];
+    c.e.forEach((e, b) => { if (e < 0.05) return; ctx.globalAlpha = e; ctx.fillRect(i * COL, h - (b + 1) * bh, COL - 0.5, bh - 0.5); });
+  }
+  ctx.globalAlpha = 1;
+}
+
+function terminal(t) {
+  const L = [];
+  const cmd = '/grill-with-docs let teams share a bot';
+  if (t < 5.0) {
+    L.push(`<div class="prompt"><span class="dim">&gt;</span> ${esc(typed(t, 3.9, cmd, 34))}<span class="caret"></span></div>`);
+    return L.join('');
+  }
+  L.push(`<div class="ln"><span class="dim">&gt;</span> ${cmd}</div>`);
+  if (after(t, 5.2)) L.push('<div class="ln"><span class="ok">⏺</span> Read(<span class="dim">GLOSSARY.md</span>)</div>');
+  if (after(t, 5.5)) L.push('<div class="ln"><span class="ok">⏺</span> Grep(<span class="dim">"role" in engine/</span>)</div>');
+  if (after(t, 5.9)) L.push('<div class="ln"><span class="ok">⏺</span> Round 1. Three things I need from you:</div>');
+  Q.forEach((q, i) => {
+    if (after(t, 6.2 + i * 0.35)) L.push(`<div class="ln">  <span class="b">Q${i + 1}</span> ${esc(q.q)}</div><div class="ln dim">    ➜ ${esc(q.rec)}</div>`);
+  });
+  if (after(t, 7.4)) L.push('<div class="ln offer"><b>v</b> · answer out loud</div>');
+  if (after(t, 8.6)) L.push('<div class="ln"><span class="dim">&gt;</span> v</div>');
+  if (after(t, 8.9)) {
+    L.push('<div class="ln"><span class="heat">⏺</span> hotseat · ask_by_voice <span class="dim">(3 questions)</span></div>');
+    if (t < 19.5) L.push(`<div class="ln">  <span class="faint">⎿</span>  <span class="dim">On a call · ${Math.min(3, ANS.filter((a) => t >= a.at).length)}/3 settled</span></div>`);
+    else {
+      L.push('<div class="ln">  <span class="faint">⎿</span>  <span class="ok">2 answers settled</span> <span class="dim">· 1 parked · 1m 48s</span></div>');
+      if (after(t, 19.9)) L.push(`<div class="ln">     <span class="b">Q1</span> the team  <span class="dim">“The people. Call it team.”</span></div><div class="ln">     <span class="b">Q2</span> members only  <span class="dim">“Right, members only.”</span></div><div class="ln">     <span class="b">Q3</span> parked  <span class="dim">“check with legal”</span></div>`);
+      if (after(t, 21.0)) L.push('<div class="ln"><span class="ok">⏺</span> Update(<span class="dim">GLOSSARY.md</span>)</div><div class="ln">  <span class="faint">⎿</span>  <span class="ok">+ Team</span> <span class="dim">The people who share bots. Avoid: workspace</span></div>');
+      if (after(t, 23.2)) L.push('<div class="ln"><span class="heat">⏺</span> hotseat · ask_by_voice <span class="dim">(round 2 · sent to the call)</span></div>');
+    }
+  }
+  if (t < 8.6 && after(t, 8.0)) L.push(`<div class="prompt"><span class="dim">&gt;</span> ${after(t, 8.2) ? 'v' : ''}<span class="caret"></span></div>`);
+  return L.join('');
+}
+
+function callwin(t) {
+  const live = t >= 9.3;
+  const thinking = t >= 20.4 && t < 23.6;
+  const r2 = t >= 23.6;
+  const secs = live ? Math.floor((t - 9.3) * 6) : 0; // the call clock runs faster than the video
+  const clk = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+  const status = !live ? 'Not on a call' : thinking ? `Claude is working · 0:${String(Math.floor((t - 20.4) * 4)).padStart(2, '0')}` : `On air · ${clk}`;
+  const tally = !live ? '' : thinking ? 'wait' : 'on';
+  let h = `<div class="bar"><span class="tally ${tally}"></span><span class="brand">hotseat</span><span class="status">${status}</span>${live ? '<span class="btn">Mute</span><span class="btn hang">Hang up</span>' : ''}</div>`;
+  if (!live) {
+    h += `<p class="lead">Claude has 3 questions <span>about letting teams share a bot.</span></p><span class="pick"><i></i>Pick up</span>`;
+  } else {
+    h += '<canvas id="spec"></canvas><div class="legend"><span>Claude</span><span class="y">You</span></div>';
+    const settled = ANS.filter((a) => t >= a.at).length;
+    if (r2) h += `<div><div class="ord">Round 2 · Question 1 of 1</div><p class="q">Should the bot remember across the team, or per chat?</p><p class="rec"><b>Claude suggests</b> Per chat.</p></div>`;
+    else if (thinking) h += `<div><div class="ord">Round 1</div><p class="q">Claude is working on your answers.</p></div>`;
+    else { const q = Q[Math.min(2, settled)]; h += `<div><div class="ord">Round 1 · Question ${Math.min(3, settled + 1)} of 3</div><p class="q">${esc(q.q)}</p><p class="rec"><b>Claude suggests</b> ${esc(q.rec)}</p></div>`; }
+    const said = SAYS.filter(([a]) => t >= a).slice(-2);
+    h += `<div class="lines">${said.map(([, w, s]) => `<div class="say"><b>${w === 'you' ? 'YOU' : 'HOTSEAT'}</b>${esc(s)}</div>`).join('')}</div>`;
+  }
+  if (!r2) {
+    h += '<div class="ledger">' + Q.map((q, i) => {
+      const a = ANS[i], done = live && t >= a.at;
+      const cls = done ? (a.parked ? 'parked' : 'done') : live && !thinking && i === ANS.filter((x) => t >= x.at).length ? 'current' : 'pending';
+      const s = { done: 'SETTLED', parked: 'PARKED', current: 'ASKING', pending: '' }[cls];
+      const extra = done ? `<div class="a">${a.parked ? esc(a.parked) : `${esc(a.a)} <q>${esc(a.quote)}</q>`}</div>` : '';
+      return `<div class="row ${cls}"><span class="n">Q${i + 1}</span><span class="t">${esc(q.title)}</span><span class="s">${s}</span>${extra}</div>`;
+    }).join('') + '</div>';
+  } else {
+    h += '<div class="ledger"><div class="row current"><span class="n">Q1</span><span class="t">Bot memory</span><span class="s">ASKING</span></div></div>';
+  }
+  return h;
+}
+
+const STEPS = [
+  [3.5, 'Claude asks you a round of questions.', ' It ends with v · answer out loud.'],
+  [8.0, 'Reply v. A call opens next to your terminal.', ''],
+  [9.6, 'Talk it through like a person.', ' Say yes, you decide, or park it.'],
+  [19.4, 'Your answers land in Claude Code,', ' in your own words.'],
+  [23.0, 'The next round goes straight into the same call.', ''],
+];
+
+window.render = (t) => {
+  $('title').style.opacity = t < 3.0 ? 1 : 1 - fade(t, 3.0, 3.5);
+  $('title').style.transform = `translateY(${-fade(t, 3.0, 3.5) * 12}px)`;
+  $('stage').style.opacity = t < 27.2 ? fade(t, 3.2, 3.7) : 1 - fade(t, 27.2, 27.7);
+  $('outro').style.opacity = fade(t, 27.4, 27.9);
+  if (t >= 3.2 && t < 27.8) {
+    $('term').innerHTML = terminal(t);
+    $('callwin').innerHTML = callwin(t);
+    drawSpec(t);
+    let k = 0;
+    STEPS.forEach(([at], i) => { if (t >= at) k = i; });
+    const [, a, b] = STEPS[k];
+    $('cap-n').textContent = k + 1;
+    $('cap-t').innerHTML = `${esc(a)}<span>${esc(b)}</span>`;
+    [...$('dots').children].forEach((d, i) => d.classList.toggle('on', i <= k));
+  }
+};
+window.DURATION = 31;
+window.render(0);
+</script>
+</body>
+</html>
