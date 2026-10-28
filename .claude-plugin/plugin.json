@@ -1,6 +1,18 @@
 {
   "name": "hotseat",
-  "version": "0.1.0",
   "description": "Answer Claude's questions out loud on a voice call.",
-  "license": "MIT"
+  "author": { "name": "jcodebreaker", "url": "https://github.com/jcodebreaker" },
+  "homepage": "https://github.com/jcodebreaker/hotseat",
+  "repository": "https://github.com/jcodebreaker/hotseat",
+  "license": "MIT",
+  "keywords": ["voice", "grilling", "elevenlabs", "interview"],
+  "userConfig": {
+    "elevenlabs_api_key": {
+      "type": "string",
+      "title": "ElevenLabs API key",
+      "description": "Used to run the voice call. Hotseat creates its voice agent in your ElevenLabs account on the first call.",
+      "sensitive": true,
+      "required": true
+    }
+  }
 }

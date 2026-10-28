@@ -32,7 +32,7 @@ call.html ──WebRTC──▶ ElevenLabs agent (prompt.md; client tools settle
 
 **stdout is the MCP transport.** Nothing in `mcp/` may write to stdout except the MCP SDK. All logs go to stderr.
 
-**Config:** `ELEVENLABS_API_KEY` from the environment (the plugin's `.mcp.json` loads `${CLAUDE_PLUGIN_ROOT}/.env` with `node --env-file-if-exists`). Agent id from `${CLAUDE_PLUGIN_ROOT}/.hotseat/agent.json`, written by `npm run setup`. Moving these to `userConfig` / `${CLAUDE_PLUGIN_DATA}` is v0.2.
+**Config (v0.2):** the ElevenLabs key comes from the plugin's `userConfig` (`elevenlabs_api_key`, sensitive, asked at install), passed to the server as `HOTSEAT_ELEVENLABS_KEY`; a checkout falls back to `ELEVENLABS_API_KEY` from `.env`. The server creates or updates the voice agent itself on the first call (`mcp/agent.mjs`, fingerprinted on prompt + tools + settings) and keeps its ids in `${CLAUDE_PLUGIN_DATA}` (`.hotseat/` in a checkout). Install: `/plugin marketplace add jcodebreaker/hotseat`, `/plugin install hotseat@hotseat`.
 
 ## Contract (server and window follow this exactly)
 

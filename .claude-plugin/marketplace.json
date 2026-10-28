@@ -1,0 +1,12 @@
+{
+  "name": "hotseat",
+  "description": "Answer Claude Code's questions out loud on a voice call.",
+  "owner": { "name": "jcodebreaker", "url": "https://github.com/jcodebreaker" },
+  "plugins": [
+    {
+      "name": "hotseat",
+      "source": "./",
+      "description": "Answer Claude's questions out loud on a voice call."
+    }
+  ]
+}

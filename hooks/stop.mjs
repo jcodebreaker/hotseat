@@ -1,7 +1,8 @@
 // Stop hook: if the person is still on a call waiting for the next round, don't let Claude end its turn
-// in silence. The MCP server keeps .hotseat/waiting-<claude pid>; we look for it up our process ancestry.
+// in silence. The MCP server keeps waiting-<claude pid> in its state dir; we look for it up our process ancestry.
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { stateDir } from '../mcp/agent.mjs';
 
 let input = {};
 try {
@@ -13,10 +14,9 @@ try {
 // One nudge per turn: if Claude already continued because of us, let it stop.
 if (input.stop_hook_active || process.platform === 'win32') process.exit(0);
 
-const root = new URL('../', import.meta.url);
 let pid = process.ppid;
 for (let i = 0; i < 6 && pid > 1; i++) {
-  if (existsSync(new URL(`.hotseat/waiting-${pid}`, root))) {
+  if (existsSync(new URL(`waiting-${pid}`, stateDir))) {
     process.stdout.write(JSON.stringify({
       decision: 'block',
       reason:

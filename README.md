@@ -4,16 +4,16 @@ A Claude Code plugin that lets you answer Claude's questions out loud. When Clau
 
 Built for Matt Pocock's [grilling and grill-with-docs skills](https://github.com/mattpocock/skills) (MIT), but it works for any round of questions.
 
-## Setup
+## Install
 
-Node 22.9 or later.
+In Claude Code:
 
-```sh
-cp .env.example .env          # add your ElevenLabs API key
-npm install
-npm run setup                 # creates the voice agent and its tools; rerun after editing prompt.md
-claude --plugin-dir /path/to/hotseat
 ```
+/plugin marketplace add jcodebreaker/hotseat
+/plugin install hotseat@hotseat
+```
+
+Paste your [ElevenLabs API key](https://elevenlabs.io/app/settings/api-keys) when asked (it goes to your system keychain), then `/reload-plugins`. On the first call Hotseat creates its voice agent in your ElevenLabs account; nothing else to set up. Needs Node 22.9 or later.
 
 ## Use
 
@@ -38,4 +38,15 @@ Claude Code ──stdio MCP──▶ mcp/server.mjs   ask_by_voice(round), end_c
 - `skills/hotseat` tells Claude to offer voice and how to use the results; `hooks/v.mjs` flags a `v` reply so it works even if Claude forgets.
 - `hooks/stop.mjs` stops Claude from ending its turn while you're on the call waiting for the next round: it has to send the round or hang up.
 - The MCP server mints a conversation token, so your API key never leaves your machine.
-- `setup.mjs` creates or updates the agent and its two client tools, and stores their ids in `.hotseat/agent.json`.
+- `mcp/agent.mjs` creates the voice agent and its two client tools on the first call, and updates them when `prompt.md` changes.
+
+
+## Develop
+
+```sh
+git clone https://github.com/jcodebreaker/hotseat && cd hotseat
+npm install
+cp .env.example .env            # ELEVENLABS_API_KEY=...
+claude --plugin-dir .
+npm run check                   # offline check of the MCP round lifecycle
+```

@@ -2,7 +2,8 @@
   "mcpServers": {
     "hotseat": {
       "command": "node",
-      "args": ["--env-file-if-exists=${CLAUDE_PLUGIN_ROOT}/.env", "${CLAUDE_PLUGIN_ROOT}/mcp/server.mjs"]
+      "args": ["--env-file-if-exists=${CLAUDE_PLUGIN_ROOT}/.env", "${CLAUDE_PLUGIN_ROOT}/mcp/server.mjs"],
+      "env": { "HOTSEAT_ELEVENLABS_KEY": "${user_config.elevenlabs_api_key}" }
     }
   }
 }

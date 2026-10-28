@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { apiKey, ensureAgent, stateDir } from './agent.mjs';
 
 const root = new URL('../', import.meta.url);
 const ms = (name, fallback) => Number(process.env[name]) || fallback;
@@ -24,14 +25,15 @@ const clients = new Set();
 let graceTimer = null;
 let connectTimer = null;
 let httpUrl = null;
+let agentReady = null; // ensureAgent() runs once per session, on the first call
 
 // While the call is open and waiting for Claude's next round, a marker file keyed by the Claude Code
 // process tells hooks/stop.mjs not to let Claude end its turn and leave the person in silence.
-const WAITING = new URL(`.hotseat/waiting-${process.ppid}`, root);
+const WAITING = new URL(`waiting-${process.ppid}`, stateDir);
 function setWaiting(on) {
   try {
     if (on) {
-      mkdirSync(new URL('.hotseat/', root), { recursive: true });
+      mkdirSync(stateDir, { recursive: true });
       writeFileSync(WAITING, '');
     } else rmSync(WAITING, { force: true });
   } catch (err) {
@@ -217,10 +219,20 @@ const routes = {
     res.end(await readFile(new URL('public/call.html', root)));
   },
   'GET /api/token': async (req, res) => {
-    const key = process.env.ELEVENLABS_API_KEY;
-    const { agentId } = await readFile(new URL('.hotseat/agent.json', root), 'utf8').then(JSON.parse).catch(() => ({}));
-    if (!key) return json(res, 500, { error: 'ELEVENLABS_API_KEY is not set. Add it to .env.' });
-    if (!agentId) return json(res, 500, { error: 'No voice agent yet. Run `npm run setup`.' });
+    const key = apiKey();
+    if (!key) return json(res, 500, { error: 'No ElevenLabs API key. Add it in /plugin under hotseat.' });
+    agentReady ??= ensureAgent(key).catch((err) => {
+      agentReady = null;
+      log(err.message, err.detail ?? '');
+      throw err;
+    });
+    let agentId;
+    try {
+      agentId = await agentReady;
+    } catch (err) {
+      const msg = err.status === 401 ? 'ElevenLabs rejected the API key.' : 'Could not set up the voice agent on ElevenLabs.';
+      return json(res, 502, { error: msg });
+    }
     const r = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${encodeURIComponent(agentId)}`, {
       headers: { 'xi-api-key': key },
     });
