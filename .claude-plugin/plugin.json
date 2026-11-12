@@ -1,18 +1,54 @@
 {
   "name": "hotseat",
-  "description": "Answer Claude's questions out loud on a voice call.",
-  "author": { "name": "jcodebreaker", "url": "https://github.com/jcodebreaker" },
+  "description": "Answer Claude's questions out loud on a voice call, on ElevenLabs or fully local (Kokoro + Whisper).",
+  "author": {
+    "name": "jcodebreaker",
+    "url": "https://github.com/jcodebreaker"
+  },
   "homepage": "https://github.com/jcodebreaker/hotseat",
   "repository": "https://github.com/jcodebreaker/hotseat",
   "license": "MIT",
-  "keywords": ["voice", "grilling", "elevenlabs", "interview"],
+  "keywords": [
+    "voice",
+    "grilling",
+    "elevenlabs",
+    "kokoro",
+    "whisper",
+    "interview"
+  ],
   "userConfig": {
     "elevenlabs_api_key": {
       "type": "string",
       "title": "ElevenLabs API key",
-      "description": "Used to run the voice call. Hotseat creates its voice agent in your ElevenLabs account on the first call.",
+      "description": "Runs the call on an ElevenLabs voice agent, created in your account on the first call. Leave empty to use the local voice (Kokoro + Whisper in your browser).",
       "sensitive": true,
-      "required": true
+      "required": false
+    },
+    "voice_engine": {
+      "type": "string",
+      "title": "Voice engine",
+      "description": "elevenlabs or local. Empty: ElevenLabs when a key is set, otherwise local.",
+      "required": false
+    },
+    "kokoro_voice": {
+      "type": "string",
+      "title": "Local voice",
+      "description": "Kokoro voice for the local engine, such as af_heart, am_michael or bf_emma. Empty: af_heart.",
+      "required": false
+    }
+  },
+  "mcpServers": {
+    "hotseat": {
+      "command": "node",
+      "args": [
+        "--env-file-if-exists=${CLAUDE_PLUGIN_ROOT}/.env",
+        "${CLAUDE_PLUGIN_ROOT}/mcp/server.mjs"
+      ],
+      "env": {
+        "HOTSEAT_ELEVENLABS_KEY": "${user_config.elevenlabs_api_key}",
+        "HOTSEAT_ENGINE_CONFIG": "${user_config.voice_engine}",
+        "HOTSEAT_KOKORO_VOICE_CONFIG": "${user_config.kokoro_voice}"
+      }
     }
   }
 }

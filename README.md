@@ -47,11 +47,23 @@ In Claude Code:
 /plugin install hotseat@hotseat
 ```
 
-Paste your [ElevenLabs API key](https://elevenlabs.io/app/settings/api-keys) when asked (it's stored in your system keychain), then run `/reload-plugins`. On the first call hotseat creates its voice agent in your ElevenLabs account. Needs Node 22.9 or later.
+Paste your [ElevenLabs API key](https://elevenlabs.io/app/settings/api-keys) when asked (it's stored in your system keychain), then run `/reload-plugins`. On the first call hotseat creates its voice agent in your ElevenLabs account. Needs Node 22.9 or later. No ElevenLabs key? Skip it and use the [local voice](#local-voice-no-elevenlabs).
 
 Try it: `/grill-with-docs <your idea>`, then reply `v`.
 
 Claude Code moves a tool call that runs longer than 2 minutes to a background task. That's expected: Claude waits, and the answers arrive when the round is done.
+
+## Local voice (no ElevenLabs)
+
+Hotseat can run the whole call in the call window, on your machine, with no account and no per-minute cost:
+
+- **Kokoro-82M** speaks ([kokoro-js](https://github.com/hexgrad/kokoro), WebGPU when available, else WASM).
+- **Whisper** listens ([transformers.js](https://github.com/huggingface/transformers.js), `whisper-base.en` by default), with a simple energy-based turn detector. Talk over it to interrupt.
+- A small rule-based interviewer stands in for the ElevenLabs agent. It follows the same rules as `prompt.md`: one question at a time, "yes" takes the recommendation, "you decide", "park it", "go back", "say that again", a recap, then "send it". Anything else is recorded as your answer in your own words, and Claude reads it.
+
+Pick it in `/plugin` under hotseat by setting **Voice engine** to `local` (or leave the ElevenLabs key empty), or put `HOTSEAT_ENGINE=local` in a checkout's `.env`. The first call downloads about 170 MB of models from Hugging Face; the browser caches them, so later calls load in seconds and run offline. The call window always uses port 47817 so that cache sticks.
+
+Trade-off: the local interviewer doesn't understand free-form talk the way an LLM agent does. It won't ask follow-ups on vague answers; it records them and leaves the reading to Claude.
 
 ## Under the hood
 

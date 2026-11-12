@@ -17,6 +17,21 @@ const PROGRESS_MS = ms('HOTSEAT_PROGRESS_MS', 15_000);
 const REVIEW_MS = ms('HOTSEAT_REVIEW_MS', 20_000);
 const log = (...args) => console.error('hotseat:', ...args);
 
+// The plugin's userConfig (NAME_CONFIG) wins over a checkout's .env (NAME). Unset userConfig values
+// arrive as the literal "${user_config...}" placeholder, so ignore those.
+const clean = (v) => (v && !v.startsWith('${') ? v.trim() : '');
+const setting = (name) => clean(process.env[`${name}_CONFIG`]) || clean(process.env[name]);
+// "elevenlabs" runs the call on an ElevenLabs agent; "local" runs Kokoro + Whisper in the browser.
+// With no choice made, use ElevenLabs when there is a key and local otherwise.
+const engine = () => {
+  const e = setting('HOTSEAT_ENGINE').toLowerCase();
+  if (e === 'local' || e === 'kokoro') return 'local';
+  if (e === 'elevenlabs') return 'elevenlabs';
+  return apiKey() ? 'elevenlabs' : 'local';
+};
+// A fixed port keeps the call window on one origin, so the browser keeps its cached local models.
+const PORT = ms('HOTSEAT_PORT', 47_817);
+
 // Session state.
 let lastRoundId = 0;
 let round = null; // the open round, or null
@@ -252,6 +267,16 @@ const routes = {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     res.end(await readFile(new URL('public/call.html', root)));
   },
+  'GET /local.js': async (req, res) => {
+    res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
+    res.end(await readFile(new URL('public/local.js', root)));
+  },
+  'GET /api/config': async (req, res) =>
+    json(res, 200, {
+      engine: engine(),
+      voice: setting('HOTSEAT_KOKORO_VOICE') || 'af_heart',
+      sttModel: setting('HOTSEAT_STT_MODEL') || 'Xenova/whisper-base.en',
+    }),
   'GET /api/token': async (req, res) => {
     const key = apiKey();
     if (!key) return json(res, 500, { error: 'No ElevenLabs API key. Add it in /plugin under hotseat.' });
@@ -311,12 +336,18 @@ function startHttp() {
         if (!res.headersSent) json(res, 400, { error: err.message });
       }
     });
-    http.on('error', reject);
-    http.listen(0, '127.0.0.1', () => {
+    let port = PORT;
+    http.on('error', (err) => {
+      // Another Claude Code session holds the fixed port: take any free one.
+      if (err.code === 'EADDRINUSE' && port) return http.listen((port = 0), '127.0.0.1');
+      reject(err);
+    });
+    http.on('listening', () => {
       httpUrl = `http://127.0.0.1:${http.address().port}`;
-      log(httpUrl);
+      log(httpUrl, `(${engine()} voice)`);
       resolve();
     });
+    http.listen(port, '127.0.0.1');
   });
   return starting;
 }

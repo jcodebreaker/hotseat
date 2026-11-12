@@ -287,7 +287,11 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 </main>
 
 <script type="module">
-import { Conversation } from 'https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.28.0/+esm';
+// The server picks the engine: an ElevenLabs agent, or Kokoro + Whisper running in this tab (local.js).
+const config = await fetch('/api/config').then((r) => r.json()).catch(() => ({ engine: 'elevenlabs' }));
+const { Conversation } = config.engine === 'local'
+  ? await import('/local.js')
+  : await import('https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.28.0/+esm');
 
 const $ = (id) => document.getElementById(id);
 const call = $('call');
@@ -599,7 +603,7 @@ function deliver(ev) {
     endTimer = setTimeout(() => conversation?.endSession(), 10_000);
   }
   render();
-  conversation.sendUserMessage(frame(ev));
+  conversation.sendUserMessage(frame(ev), ev);
 }
 
 function onEvent(ev) {
@@ -727,11 +731,14 @@ async function start() {
   setState('connecting');
   try {
     await navigator.mediaDevices.getUserMedia({ audio: true });
-    const t = await fetch('/api/token').then((r) => r.json());
-    if (!t.token) throw new Error(t.error || 'No conversation token.');
+    let auth = { config, onStatus: (text) => { $('start-label').textContent = text; } };
+    if (config.engine !== 'local') {
+      const t = await fetch('/api/token').then((r) => r.json());
+      if (!t.token) throw new Error(t.error || 'No conversation token.');
+      auth = { conversationToken: t.token, connectionType: 'webrtc' };
+    }
     const c = await Conversation.startSession({
-      conversationToken: t.token,
-      connectionType: 'webrtc',
+      ...auth,
       clientTools,
       onDisconnect,
       onModeChange: ({ mode }) => {
