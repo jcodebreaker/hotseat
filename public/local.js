@@ -276,7 +276,9 @@ const words = (t) => (t ? t.split(' ').length : 0);
 const sentence = (t) => { t = t.trim(); return /[.!?]$/.test(t) ? t : `${t}.`; };
 const clip = (t, n = 10) => { const w = t.trim().replace(/[.!?]+$/, '').split(/\s+/); return w.length > n ? `${w.slice(0, n).join(' ')}…` : w.join(' '); };
 
-const YES = /^(yes|yeah|yep|yup|ya|sure|ok|okay|right|correct|exactly|agreed|absolutely|definitely|perfect|fine|great|good|cool|sounds (good|right|great|fine)|that'?s (right|fine|good|it)|go (with|for) (it|that)|do (it|that)|makes sense|let'?s do (it|that)|i agree)\b/;
+// Thinking noises are not answers; "mhm" and "uh huh" mean yes.
+const FILLER = /^((h?m+)|(u+h+)|(u+m+)|(e+r+)|(a+h+)|(o+h+)|well|so|hmm+|let me think|um+ let me think)$/;
+const YES = /^(mhm|mm hmm|uh huh|yes|yeah|yep|yup|ya|sure|ok|okay|right|correct|exactly|agreed|absolutely|definitely|perfect|fine|great|good|cool|sounds (good|right|great|fine)|that'?s (right|fine|good|it)|go (with|for) (it|that)|do (it|that)|makes sense|let'?s do (it|that)|i agree)\b/;
 const NO = /^(no|nope|nah|not really|no way|i don'?t think so)$/;
 const DECIDE = /\b(you decide|your call|up to you|you choose|you pick|whatever you (think|recommend|suggest)|go with your|i don'?t mind|either (is|way)|dealer'?s choice|don'?t care)\b/;
 const PARK = /\b(park (it|that|this)|skip (it|that|this)|come back to (it|that|this)|later|pass|not sure yet|no idea|next question|park|skip)\b/;
@@ -361,6 +363,10 @@ class Interviewer {
   async hear(text) {
     const t = norm(text);
     if (!t) return;
+    if (FILLER.test(t)) {
+      if (this.phase === 'asking' || this.phase === 'review') this.s.say('Take your time.');
+      return;
+    }
     if (this.phase === 'asking') return this.answer(text, t);
     if (this.phase === 'review') return this.review(t);
     if (this.phase === 'thinking' || this.phase === 'waiting') return void this.s.say("Claude's still on it. One moment.");
