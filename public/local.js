@@ -15,6 +15,7 @@ const START_FRAMES = 4;      // 80 ms above threshold starts an utterance
 const END_MS = 800;          // this much quiet ends it
 const MIN_SPEECH_MS = 250;   // shorter blips are ignored
 const MAX_UTTER_MS = 30_000;
+const GRACE_MS = 400;        // after transcribing, this much more quiet before acting on it
 const PREROLL = 15;          // frames kept from before the start (300 ms)
 
 export const Conversation = { startSession: (opts) => LocalSession.start(opts) };
@@ -65,12 +66,23 @@ class LocalSession {
         device: webgpu ? 'webgpu' : 'wasm',
         progress_callback: progress,
       }),
-      pipeline('automatic-speech-recognition', this.config.sttModel || 'Xenova/whisper-base.en', {
+      // WebGPU transcribes about 7x faster than WASM; fall back if it won't load.
+      (webgpu
+        ? pipeline('automatic-speech-recognition', this.config.sttModel || 'onnx-community/whisper-base.en', {
+            device: 'webgpu',
+            dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' },
+            progress_callback: progress,
+          }).catch(() => null)
+        : Promise.resolve(null)
+      ).then((asr) => asr ?? pipeline('automatic-speech-recognition', this.config.sttModel || 'Xenova/whisper-base.en', {
         dtype: 'q8',
         device: 'wasm',
         progress_callback: progress,
-      }),
+      })),
     ]);
+    // The first inference compiles kernels; do it now, not on the person's first answer.
+    this.status('Warming up…');
+    await Promise.all([this.asr(new Float32Array(16_000)), this.tts.generate('Hi.', { voice: this.voice })]);
     this.status('Connecting…');
   }
 
@@ -152,11 +164,12 @@ class LocalSession {
       v.active = false;
       v.frames = [];
       v.loud = 0;
-      if (speechMs >= MIN_SPEECH_MS) this.transcribe(frames);
+      if (speechMs >= MIN_SPEECH_MS) this.transcribe(frames, performance.now());
+      else if (this.held) this.flushHeld(); // only a cough after a pause: the held answer was the whole answer
     }
   }
 
-  transcribe(frames) {
+  transcribe(frames, endedAt) {
     const audio = new Float32Array(frames.length * FRAME);
     frames.forEach((f, i) => audio.set(f, i * FRAME));
     this.hearing = this.hearing.then(async () => {
@@ -164,14 +177,38 @@ class LocalSession {
       try {
         const out = await this.asr(audio);
         // Whisper marks noise as [BLANK_AUDIO], (coughs), *music* and the like.
-        const text = String(out?.text ?? '').replace(/\[[^\]]*\]|\([^)]*\)|\*[^*]*\*/g, ' ').replace(/\s+/g, ' ').trim();
-        if (!text || this.closed) return;
-        this.opts.onMessage?.({ source: 'user', message: text });
-        await this.interviewer.hear(text);
+        let text = String(out?.text ?? '').replace(/\[[^\]]*\]|\([^)]*\)|\*[^*]*\*/g, ' ').replace(/\s+/g, ' ').trim();
+        if (this.closed || (!text && !this.held)) return;
+        // Talking again within the grace window: that was a pause mid-answer. Hold it for the rest.
+        const left = endedAt + GRACE_MS - performance.now();
+        if (left > 0) await new Promise((r) => setTimeout(r, left));
+        if (this.vad.active) {
+          this.held = `${this.held ?? ''} ${text}`.trim();
+          // If that turns out to be a cough (too short to transcribe), don't sit on the answer.
+          clearTimeout(this.heldTimer);
+          this.heldTimer = setTimeout(() => this.flushHeld(), 3000);
+          return;
+        }
+        await this.deliver(text);
       } catch (e) {
         this.opts.onError?.(e);
       }
     });
+  }
+
+  async deliver(text) {
+    clearTimeout(this.heldTimer);
+    text = `${this.held ?? ''} ${text}`.trim();
+    this.held = null;
+    if (!text) return;
+    this.opts.onMessage?.({ source: 'user', message: text });
+    await this.interviewer.hear(text);
+  }
+
+  flushHeld() {
+    if (!this.held || this.closed) return;
+    if (this.vad.active) return void (this.heldTimer = setTimeout(() => this.flushHeld(), 1000));
+    this.hearing = this.hearing.then(() => this.deliver('')).catch((e) => this.opts.onError?.(e));
   }
 
   // ---------- speech ----------
@@ -286,7 +323,29 @@ const BACK = /\b(go back|previous (one|question)|back to the (last|previous)|und
 const REPEAT = /\b(repeat|say (that|it) again|what was the question|pardon|come again|sorry what)\b/;
 const SEND = /\b(send( it)?|confirm|looks good|ship it|go ahead|that'?s (it|all)|all good|done)\b/;
 const CHANGE = /\b(change|wait|redo|fix|actually|go back|wrong|edit)\b/;
-const ORDINALS = { first: 1, one: 1, second: 2, two: 2, third: 3, three: 3, fourth: 4, four: 4, fifth: 5, five: 5, sixth: 6, six: 6, seventh: 7, seven: 7, eighth: 8, eight: 8, ninth: 9, nine: 9, tenth: 10, ten: 10 };
+const ACKS = ['Got it.', 'Okay.', 'Noted.', 'Great.', 'Cool.'];
+// "Yes" accepts the recommendation only when nothing else was said: "Yeah, let's use Redis instead" is an answer.
+const POLITE = /^(please|thanks|thank you|to me|for me|i think|i guess|so|then|totally|indeed|let'?s go|go ahead)\b/;
+function onlyYes(t) {
+  let rest = t, before;
+  do {
+    before = rest;
+    rest = rest.replace(YES, '').replace(POLITE, '').trim();
+  } while (rest && rest !== before);
+  return !rest && t !== '';
+}
+
+// "the second one" is question 2, not question 1: ordinals first, then digits, then a bare cardinal.
+const ORDINALS = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'];
+const CARDINALS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+function whichQuestion(t) {
+  const o = ORDINALS.findIndex((w) => new RegExp(`\\b${w}\\b`).test(t));
+  if (o >= 0) return o + 1;
+  const d = /\b(\d+)(st|nd|rd|th)?\b/.exec(t);
+  if (d) return Number(d[1]);
+  const c = CARDINALS.findIndex((w) => new RegExp(`(?<!\\b(the|that|this|last) )\\b${w}\\b`).test(t));
+  return c + 1;
+}
 
 class Interviewer {
   constructor(session) {
@@ -318,11 +377,14 @@ class Interviewer {
     if (type === 'round') return this.startRound(ev?.data ?? parseRound(text));
     if (type === 'thinking') {
       if (this.phase === 'thinking') return;
+      const held = this.phase === 'waiting'; // already said "passing it to Claude"
       this.phase = 'thinking';
-      return void this.s.say("Give me a sec, Claude's writing that down.");
+      return void (held || this.s.say("Give me a sec, Claude's writing that down."));
     }
     if (type === 'end') {
       this.phase = 'ended';
+      // Drop queued holding lines, so call.html's speaking -> listening end check waits for the goodbye.
+      this.s.stopSpeaking();
       return void this.s.say("That's everything for now. Thanks, talk soon.");
     }
     const change = /^\[CLAUDE\] change (\S+)/.exec(text);
@@ -331,6 +393,8 @@ class Interviewer {
 
   startRound(r) {
     if (!r?.questions?.length) return;
+    clearTimeout(this.s.heldTimer);
+    this.s.held = null;
     this.round = r;
     this.answers = {};
     this.idx = 0;
@@ -391,21 +455,28 @@ class Interviewer {
 
     if (DECIDE.test(t)) {
       if (!q.recommendation) return void this.s.say("I don't have a suggestion for this one. What's your gut say?");
-      this.s.say(`Okay, going with ${clip(q.recommendation)}.`);
-      return this.settle(q.recommendation, quote);
+      return this.settle(q.recommendation, quote, `Okay, going with ${clip(q.recommendation)}.`);
     }
     if (PARK.test(t) && (words(t) <= 6 || /\bpark (it|that|this)\b/.test(t))) return this.park(text);
-    if (YES.test(t) && words(t) <= 8 && !/\b(but|except|although|no|not)\b/.test(t)) return this.settle(q.recommendation || 'Yes.', quote);
+    if (!quote.includes(' … ') && onlyYes(t)) return this.settle(q.recommendation || 'Yes.', quote);
+    // A lone word that isn't yes/no is often a mishearing ("hmm" -> "Him."): check once, then accept it.
+    if (words(t) === 1 && this.unclear !== q.id) {
+      this.unclear = q.id;
+      this.pendingNo = quote === text ? null : quote.split(' … ')[0];
+      return void this.s.say('Sorry, say that again?');
+    }
+    this.unclear = null;
     // Anything else is their answer in their own words; Claude reads the quote.
     return this.settle(sentence(text), quote);
   }
 
-  async settle(answer, quote) {
+  // `ack` is said before the next question, so moving on sounds like a person, not a form.
+  async settle(answer, quote, ack = ACKS[Math.floor(Math.random() * ACKS.length)]) {
     const id = this.q.id;
     const res = await this.tools.settle_answer({ question_id: id, answer, quote });
     if (/closed/i.test(res)) return void (this.phase = 'waiting');
     this.answers[id] = { status: 'settled', answer };
-    this.next();
+    this.next(ack);
   }
 
   async park(reason) {
@@ -413,26 +484,27 @@ class Interviewer {
     const res = await this.tools.park_question({ question_id: id, reason });
     if (/closed/i.test(res)) return void (this.phase = 'waiting');
     this.answers[id] = { status: 'parked', reason };
-    this.s.say('Parked.');
-    this.next();
+    this.next('Parked.');
   }
 
-  next() {
+  next(ack = '') {
+    const lead = ack ? `${ack} ` : '';
     const qs = this.round.questions;
     if (this.changing) {
       this.changing = false;
       if (qs.every((q) => this.answers[q.id])) {
         this.phase = 'review';
-        return void this.s.say('Updated. Send it now?');
+        return void this.s.say(`${lead}Updated. Send it now?`);
       }
     }
     const open = qs.findIndex((q, i) => i > this.idx && !this.answers[q.id]);
     const first = open >= 0 ? open : qs.findIndex((q) => !this.answers[q.id]);
     if (first >= 0) {
       this.idx = first;
-      return void this.ask();
+      return void this.ask(lead);
     }
     if (qs.length === 1) {
+      if (this.phase === 'thinking') return; // the server already said it's with Claude
       this.phase = 'waiting';
       return void this.s.say('Got it, passing it to Claude.');
     }
@@ -442,18 +514,18 @@ class Interviewer {
       return a.status === 'parked' ? `${q.title || 'one'} parked` : clip(a.answer, 8);
     });
     const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')}, and ${parts.at(-1)}` : parts[0];
-    this.s.say(`Quick check: ${list}. Send it to Claude?`);
+    this.s.say(`${lead}Quick check: ${list}. Send it to Claude?`);
   }
 
   async review(t) {
-    const n = Object.entries(ORDINALS).find(([w]) => new RegExp(`\\b${w}\\b`).test(t))?.[1] ?? Number(/\b(\d+)\b/.exec(t)?.[1]);
-    const wantsChange = CHANGE.test(t) || BACK.test(t) || /\blast one\b/.test(t);
+    const n = whichQuestion(t);
+    const wantsChange = CHANGE.test(t) || BACK.test(t) || /\blast one\b/.test(t) || n > 0;
     if (wantsChange) {
       const qs = this.round.questions;
       const i = /\blast\b/.test(t) || !n ? qs.length - 1 : Math.min(qs.length, n) - 1;
       return this.redo(qs[i].id);
     }
-    if (SEND.test(t) || YES.test(t)) {
+    if (SEND.test(t) || onlyYes(t)) {
       this.phase = 'waiting';
       const res = await this.tools.confirm_round();
       return void this.s.say(/closed|sent/i.test(res) ? 'Got it, passing it to Claude.' : res);

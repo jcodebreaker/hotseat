@@ -34,6 +34,9 @@ const PORT = ms('HOTSEAT_PORT', 47_817);
 
 // Session state.
 let lastRoundId = 0;
+// Round ids restart with each server. A call tab left open from an earlier session sees a new boot id
+// and reloads, instead of skipping "round 1" as one it already handled.
+const BOOT = Math.random().toString(36).slice(2);
 let round = null; // the open round, or null
 let finished = false; // a round has finished since the last end_call
 let ended = false;
@@ -69,7 +72,7 @@ const roundEvent = (r) => ({ roundId: r.id, topic: r.topic, round: r.round, ques
 
 function onSseConnect(req, res) {
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
-  res.write(': hotseat\n\n');
+  res.write(`: hotseat\n\nevent: hello\ndata: ${JSON.stringify({ boot: BOOT })}\n\n`);
   clients.add(res);
   clearTimeout(graceTimer);
   clearTimeout(connectTimer);
@@ -275,7 +278,7 @@ const routes = {
     json(res, 200, {
       engine: engine(),
       voice: setting('HOTSEAT_KOKORO_VOICE') || 'af_heart',
-      sttModel: setting('HOTSEAT_STT_MODEL') || 'Xenova/whisper-base.en',
+      sttModel: setting('HOTSEAT_STT_MODEL'), // empty: local.js picks the model that fits the device
     }),
   'GET /api/token': async (req, res) => {
     const key = apiKey();

@@ -624,6 +624,16 @@ function flush() {
 }
 
 const events = new EventSource('/api/events');
+// A new boot id means a new hotseat server: this tab's round state belongs to the old one.
+let boot = null;
+events.addEventListener('hello', (e) => {
+  const id = JSON.parse(e.data || '{}').boot;
+  if (boot && id !== boot) {
+    inCall = false; // the old call is gone; don't send its hang-up to the new server
+    location.reload();
+  }
+  boot = id;
+});
 for (const type of ['round', 'thinking', 'end']) {
   events.addEventListener(type, (e) => {
     let data = {};

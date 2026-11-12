@@ -51,7 +51,10 @@ function sse(base) {
         const frame = buf.slice(0, i);
         buf = buf.slice(i + 2);
         const event = frame.match(/^event: (.*)$/m)?.[1];
-        if (event) events.push({ event, data: JSON.parse(frame.match(/^data: (.*)$/m)[1]) });
+        const data = event && JSON.parse(frame.match(/^data: (.*)$/m)[1]);
+        // Every connection opens with the server's boot id; the round flow starts after it.
+        if (event === 'hello') assert.match(data.boot, /^\w+$/);
+        else if (event) events.push({ event, data });
         wake();
       }
     }
