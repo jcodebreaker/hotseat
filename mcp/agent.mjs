@@ -34,7 +34,8 @@ const clientTool = (name, description, properties) => ({
 
 const questionId = { type: 'string', description: 'The id of the question from the current round, such as q1.' };
 
-const tools = {
+// The agent's client tools. mcp/realtime.mjs reuses them for the OpenAI Realtime engine.
+export const tools = {
   settle_answer: clientTool(
     'settle_answer',
     'Record the answer to one question once it is unambiguous, before asking the next one. Call it again for the same question to replace the answer ("go back").',

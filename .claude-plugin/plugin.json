@@ -1,6 +1,6 @@
 {
   "name": "hotseat",
-  "description": "Answer Claude's questions out loud on a voice call, on ElevenLabs or fully local (Kokoro + Whisper).",
+  "description": "Answer Claude's questions out loud on a voice call, on ElevenLabs, OpenAI Realtime or fully local (Kokoro + Whisper).",
   "author": {
     "name": "jcodebreaker",
     "url": "https://github.com/jcodebreaker"
@@ -12,6 +12,8 @@
     "voice",
     "grilling",
     "elevenlabs",
+    "openai",
+    "realtime",
     "kokoro",
     "whisper",
     "interview"
@@ -24,10 +26,17 @@
       "sensitive": true,
       "required": false
     },
+    "openai_api_key": {
+      "type": "string",
+      "title": "OpenAI API key",
+      "description": "Runs the call on OpenAI Realtime (gpt-realtime). Used when Voice engine is openai, or when no ElevenLabs key is set.",
+      "sensitive": true,
+      "required": false
+    },
     "voice_engine": {
       "type": "string",
       "title": "Voice engine",
-      "description": "elevenlabs or local. Empty: ElevenLabs when a key is set, otherwise local.",
+      "description": "elevenlabs, openai or local. Empty: ElevenLabs when its key is set, else OpenAI when its key is set, otherwise local.",
       "required": false
     },
     "kokoro_voice": {
@@ -46,6 +55,7 @@
       ],
       "env": {
         "HOTSEAT_ELEVENLABS_KEY": "${user_config.elevenlabs_api_key}",
+        "HOTSEAT_OPENAI_KEY": "${user_config.openai_api_key}",
         "HOTSEAT_ENGINE_CONFIG": "${user_config.voice_engine}",
         "HOTSEAT_KOKORO_VOICE_CONFIG": "${user_config.kokoro_voice}"
       }

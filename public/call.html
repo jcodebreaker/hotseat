@@ -287,11 +287,14 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 </main>
 
 <script type="module">
-// The server picks the engine: an ElevenLabs agent, or Kokoro + Whisper running in this tab (local.js).
+// The server picks the engine: an ElevenLabs agent, OpenAI Realtime (openai.js), or Kokoro + Whisper
+// running in this tab (local.js).
 const config = await fetch('/api/config').then((r) => r.json()).catch(() => ({ engine: 'elevenlabs' }));
 const { Conversation } = config.engine === 'local'
   ? await import('/local.js')
-  : await import('https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.28.0/+esm');
+  : config.engine === 'openai'
+    ? await import('/openai.js')
+    : await import('https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.28.0/+esm');
 
 const $ = (id) => document.getElementById(id);
 const call = $('call');

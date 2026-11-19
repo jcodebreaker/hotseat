@@ -8,6 +8,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { apiKey, ensureAgent, stateDir } from './agent.mjs';
+import { clientSecret, openaiKey } from './realtime.mjs';
 
 const root = new URL('../', import.meta.url);
 const ms = (name, fallback) => Number(process.env[name]) || fallback;
@@ -21,13 +22,17 @@ const log = (...args) => console.error('hotseat:', ...args);
 // arrive as the literal "${user_config...}" placeholder, so ignore those.
 const clean = (v) => (v && !v.startsWith('${') ? v.trim() : '');
 const setting = (name) => clean(process.env[`${name}_CONFIG`]) || clean(process.env[name]);
-// "elevenlabs" runs the call on an ElevenLabs agent; "local" runs Kokoro + Whisper in the browser.
-// With no choice made, use ElevenLabs when there is a key and local otherwise.
+// "elevenlabs" runs the call on an ElevenLabs agent; "openai" on OpenAI Realtime; "local" runs
+// Kokoro + Whisper in the browser. With no choice made, use ElevenLabs when there is a key, then
+// OpenAI when the plugin was given an OpenAI key (a shell's OPENAI_API_KEY alone doesn't pick it),
+// and local otherwise.
 const engine = () => {
   const e = setting('HOTSEAT_ENGINE').toLowerCase();
   if (e === 'local' || e === 'kokoro') return 'local';
   if (e === 'elevenlabs') return 'elevenlabs';
-  return apiKey() ? 'elevenlabs' : 'local';
+  if (e === 'openai' || e === 'realtime') return 'openai';
+  if (apiKey()) return 'elevenlabs';
+  return clean(process.env.HOTSEAT_OPENAI_KEY) ? 'openai' : 'local';
 };
 // A fixed port keeps the call window on one origin, so the browser keeps its cached local models.
 const PORT = ms('HOTSEAT_PORT', 47_817);
@@ -274,6 +279,10 @@ const routes = {
     res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
     res.end(await readFile(new URL('public/local.js', root)));
   },
+  'GET /openai.js': async (req, res) => {
+    res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
+    res.end(await readFile(new URL('public/openai.js', root)));
+  },
   'GET /api/config': async (req, res) =>
     json(res, 200, {
       engine: engine(),
@@ -281,6 +290,16 @@ const routes = {
       sttModel: setting('HOTSEAT_STT_MODEL'), // empty: local.js picks the model that fits the device
     }),
   'GET /api/token': async (req, res) => {
+    if (engine() === 'openai') {
+      const key = openaiKey();
+      if (!key) return json(res, 500, { error: 'No OpenAI API key. Add it in /plugin under hotseat.' });
+      try {
+        return json(res, 200, { token: await clientSecret(key, setting) });
+      } catch (err) {
+        log(err.message, err.detail ?? '');
+        return json(res, 502, { error: err.status === 401 ? 'OpenAI rejected the API key.' : 'Could not start an OpenAI Realtime session.' });
+      }
+    }
     const key = apiKey();
     if (!key) return json(res, 500, { error: 'No ElevenLabs API key. Add it in /plugin under hotseat.' });
     agentReady ??= ensureAgent(key).catch((err) => {

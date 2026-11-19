@@ -65,13 +65,24 @@ Pick it in `/plugin` under hotseat by setting **Voice engine** to `local` (or le
 
 Trade-off: the local interviewer doesn't understand free-form talk the way an LLM agent does. It won't ask follow-ups on vague answers; it records them and leaves the reading to Claude.
 
+## OpenAI Realtime
+
+Hotseat can also run the call on [OpenAI Realtime](https://platform.openai.com/docs/guides/realtime) (`gpt-realtime-2.1`). Paste an OpenAI API key in `/plugin` under hotseat and set **Voice engine** to `openai`, or put `HOTSEAT_ENGINE=openai` and `OPENAI_API_KEY=...` in a checkout's `.env`.
+
+- Nothing to create in your account: each call gets a short-lived client secret carrying `prompt.md`, the tools and the voice. Your API key stays in the server process.
+- The browser talks to OpenAI over WebRTC. Interrupting uses OpenAI's `semantic_vad`.
+- Quotes come from OpenAI's transcription of your last turn, not from the model's retelling, so your exact words still reach Claude.
+- Optional: `HOTSEAT_REALTIME_MODEL`, `HOTSEAT_REALTIME_VOICE` (default `marin`), `HOTSEAT_REALTIME_STT_MODEL` (default `gpt-live-transcribe`).
+
+Trade-off: the agent thinks with OpenAI's realtime model instead of Claude (`HOTSEAT_LLM` only applies to ElevenLabs). Billing is per audio token.
+
 ## Under the hood
 
 ```
 Claude Code ──stdio MCP──▶ mcp/server.mjs   ask_by_voice(round), end_call()
                               │ HTTP on 127.0.0.1, random port
                               ▼
-                         public/call.html ──WebRTC──▶ ElevenLabs agent (prompt.md)
+                         public/call.html ──WebRTC──▶ ElevenLabs agent or OpenAI Realtime (prompt.md)
                               ▲                            │
                               └── settle_answer / park_question (client tools)
 ```
@@ -84,7 +95,7 @@ Claude Code ──stdio MCP──▶ mcp/server.mjs   ask_by_voice(round), end_c
 ## Privacy
 
 - The local server listens on `127.0.0.1` only. Your API key stays in the server process and never reaches the browser, which gets a short-lived conversation token instead.
-- Call audio and the round's questions go to ElevenLabs, which runs the voice agent. The call window loads the ElevenLabs SDK from jsDelivr and its fonts from Google Fonts. hotseat has no server of its own.
+- Call audio and the round's questions go to ElevenLabs or OpenAI, whichever runs the voice agent. The call window loads the ElevenLabs SDK from jsDelivr and its fonts from Google Fonts. hotseat has no server of its own.
 
 ## Develop
 
@@ -100,7 +111,8 @@ npm run check                   # offline check of the MCP round lifecycle
 
 - [ ] Mid-call lookups: "Claude's checking…" while a sub-agent reads the repo, without leaving the call
 - [ ] A menu-bar call window instead of a browser tab
-- [ ] More voice providers behind the same contract (OpenAI Realtime first)
+- [x] OpenAI Realtime behind the same contract
+- [ ] More voice providers
 - [ ] Grill a diff or a PR, not only an idea
 
 MIT.
